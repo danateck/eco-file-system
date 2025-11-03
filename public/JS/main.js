@@ -5,7 +5,7 @@
 
 
 
-
+let stopWatching = null;
 // Add this helper function at the top of your main.js
 function getCurrentUserEmail() {
   return sessionStorage.getItem("docArchiveCurrentUser") || "";
@@ -384,77 +384,38 @@ async function bootFromCloud() {
 
 
 
-async function uploadDocumentWithStorage(file, metadata = {}) {
-  const raw = getCurrentUserEmail();
-  const currentUser = raw ? normalizeEmail(raw) : null;
+async function uploadDocumentWithStorage(file, metadata = {}, forcedId=null) {
+  const currentUser = normalizeEmail(getCurrentUserEmail());
   if (!currentUser) throw new Error("User not logged in");
 
-  // Generate doc ID
-  const newId = crypto.randomUUID();
-  
+  const id = forcedId || crypto.randomUUID();
   let downloadURL = null;
-  
-  // Upload to Firebase Storage if available
-  if (isFirebaseAvailable() && window.storage) {
-    try {
-      showLoading("מעלה קובץ לענן...");
-      
-      const storageRef = window.fs.ref(
-        window.storage, 
-        `documents/${currentUser}/${newId}_${file.name}`
-      );
-      
-      const snapshot = await window.fs.uploadBytes(storageRef, file);
-      downloadURL = await window.fs.getDownloadURL(snapshot.ref);
-      
-      console.log("✅ File uploaded to Storage:", downloadURL);
-      
-    } catch (e) {
-      console.error("❌ Storage upload failed:", e);
-      showNotification("העלאה לענן נכשלה, שומר במכשיר בלבד", true);
-    }
+
+  // (optional) upload bytes to Storage
+  if (window.storage && isFirebaseAvailable()) {
+    const storageRef = window.fs.ref(window.storage, `documents/${currentUser}/${id}_${file.name}`);
+    const snap = await window.fs.uploadBytes(storageRef, file);
+    downloadURL = await window.fs.getDownloadURL(snap.ref);
   }
-  
-  // Save metadata to Firestore
-  if (isFirebaseAvailable()) {
-    try {
-      const docRef = window.fs.doc(window.db, "documents", newId);
-      const docData = {
-        ...metadata,
-        owner: currentUser,
-        downloadURL: downloadURL,
-        fileName: file.name,
-        fileSize: file.size,
-        fileType: file.type,
-        uploadedAt: Date.now(),
-        sharedWith: Array.isArray(metadata.sharedWith) ? metadata.sharedWith : [],
-        deletedAt: null,
-        deletedBy: null
-      };
-      
-      await window.fs.setDoc(docRef, docData, { merge: true });
-      console.log("✅ Document metadata saved to Firestore");
-      
-      return { id: newId, ...docData };
-      
-    } catch (e) {
-      console.error("❌ Firestore save failed:", e);
-      throw e;
-    }
-  }
-  
-  // Fallback: local only
-  return {
-    id: newId,
+
+  // write metadata to Firestore
+  const docRef = window.fs.doc(window.db, "documents", id);
+  const docData = {
     ...metadata,
-    fileName: file.name,
-    fileSize: file.size,
-    fileType: file.type,
-    uploadedAt: Date.now(),
     owner: currentUser,
-    downloadURL: null
+    sharedWith: Array.isArray(metadata.sharedWith) ? metadata.sharedWith : [],
+    fileName: file.name,
+    fileType: file.type,
+    fileSize: file.size,
+    uploadedAt: Date.now(),
+    downloadURL: downloadURL || null,
+    deletedAt: null,
+    deletedBy: null,
   };
+  await window.fs.setDoc(docRef, docData, { merge: true });
+  return { id, ...docData };
 }
+
 
 
 // 3. Updated file upload handler (replace in your DOMContentLoaded)
@@ -784,6 +745,25 @@ console.log("✅ Enhanced Firebase persistence loaded");
 
 
 
+// generate ONE id, use it everywhere
+const id = crypto.randomUUID();
+
+// save a base64 copy in IndexedDB (local cache)
+await saveFileToDB(id, fileDataBase64);
+
+// write to cloud
+const cloudDoc = await uploadDocumentWithStorage(file, {
+  title: file.name, category: guessedCategory, /* …your fields… */
+}, id);
+
+// push to your in-memory array using the *same* id
+allDocsData.push({ id, ...cloudDoc, hasFile: true, originalFileName: file.name, mimeType: file.type });
+setUserDocs(userNow, allDocsData, allUsersData);
+
+
+
+
+
 function openDB() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open("docArchiveDB", 1);
@@ -1095,7 +1075,15 @@ async function getPendingInvitesFromFirestore(userEmail) {
 }
 
 
-let stopWatching = null;
+// At the very top of main.
+
+// Later, just reassign it — never redeclare
+if (stopWatching) stopWatching();
+stopWatching = watchPendingInvites(async (invites) => {
+  console.log("🔔 Real-time update:", invites.length, "invites");
+  paintPending(invites);
+});
+
 
 function watchPendingInvites(onChange) {
   const allUsers = loadAllUsersDataFromStorage();
@@ -1297,6 +1285,80 @@ async function syncMySharedDocsToFirestore() {
     }
   }
 }
+
+
+
+
+
+
+
+
+
+function watchMyDocs() {
+  if (stopWatching) stopWatching();
+
+  const me = normalizeEmail(getCurrentUserEmail());
+  if (!me || !isFirebaseAvailable()) return () => {};
+
+  const col = window.fs.collection(window.db, "documents");
+  const qOwned  = window.fs.query(col, window.fs.where("owner", "==", me));
+  const qShared = window.fs.query(col, window.fs.where("sharedWith", "array-contains", me));
+
+  const unsubOwned  = window.fs.onSnapshot(qOwned,  snap => updateFromSnaps("owned",  snap));
+  const unsubShared = window.fs.onSnapshot(qShared, snap => updateFromSnaps("shared", snap));
+
+  function updateFromSnaps(kind, snap) {
+    const map = new Map(allDocsData.map(d => [d.id, d]));
+    snap.forEach(doc => map.set(doc.id, { id: doc.id, ...doc.data() }));
+    allDocsData = [...map.values()];
+    setUserDocs(userNow, allDocsData, allUsersData);
+    // optionally re-render the current view
+    if (!homeView.classList.contains("hidden")) renderHome();
+  }
+
+  stopWatching = () => { unsubOwned(); unsubShared(); };
+  return stopWatching;
+}
+
+// on boot after login:
+async function bootFromCloud() {
+  try {
+    showLoading("טוען מסמכים מהענן...");
+    const cloudDocs = await loadDocuments();        // your v9 loader
+    allDocsData = cloudDocs || [];
+    setUserDocs(userNow, allDocsData, allUsersData);
+  } finally {
+    hideLoading();
+    renderHome();
+    watchMyDocs();                                  // <-- start live sync
+  }
+}
+
+
+
+
+async function migrateLocalDocsToDocuments() {
+  if (!isFirebaseAvailable()) { console.warn("Firebase unavailable"); return; }
+  const me = normalizeEmail(getCurrentUserEmail());
+  let pushed = 0;
+  for (const d of allDocsData) {
+    if (!d || d._trashed) continue;
+    const ref = window.fs.doc(window.db, "documents", d.id || crypto.randomUUID());
+    await window.fs.setDoc(ref, { ...d, owner: me }, { merge: true });
+    pushed++;
+  }
+  console.log("Migrated", pushed, "docs");
+}
+
+
+window.isFirebaseAvailable = function () {
+  try { return !!(window.db && window.fs && typeof window.fs.getDoc === "function"); }
+  catch { return false; }
+};
+
+
+
+
 
 
 

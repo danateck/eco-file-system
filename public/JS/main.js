@@ -2376,6 +2376,28 @@ renderPending();
 allDocsData.push(newDoc);
 setUserDocs(userNow, allDocsData, allUsersData);
 
+
+// === Mirror to Firestore (owner document) ===
+if (isFirebaseAvailable()) {
+  try {
+    const ownerEmail = normalizeEmail(getCurrentUserEmail() || userNow);
+    const docRef = window.fs.doc(window.db, "documents", newId);
+
+    // Write metadata only (do NOT store the base64)
+    await window.fs.setDoc(docRef, {
+      ...newDoc,
+      owner: ownerEmail,
+      // make sure we don't accidentally write any large dataURL fields
+      fileDataBase64: undefined
+    }, { merge: true });
+
+    console.log("✅ Mirrored owner doc to Firestore:", newId);
+  } catch (e) {
+    console.error("❌ Firestore mirror failed:", e);
+  }
+}
+
+
 // If this doc is in a shared folder, sync to Firestore immediately
 if (newDoc.sharedFolderId && isFirebaseAvailable()) {
   console.log("🔄 New doc has sharedFolderId, syncing to Firestore...");
@@ -2462,39 +2484,33 @@ function getCurrentUserEmail() {
 // ============================================
 // FIX 1: Load documents with user filtering
 // ============================================
+// v9 modular version
 async function loadDocuments() {
-  const currentUser = getCurrentUserEmail();
+  const raw = getCurrentUserEmail();
+  const currentUser = raw ? normalizeEmail(raw) : null;
   if (!currentUser) {
     console.error("No user logged in");
     return [];
   }
+  if (!isFirebaseAvailable()) {
+    console.warn("Firebase unavailable; returning local-only docs");
+    return getUserDocs(getCurrentUser()); // or your local fallback
+  }
 
   try {
-    const docsCol = window.db.collection("documents");
-    
-    // Query only documents where:
-    // - owner matches current user, OR
-    // - sharedWith array contains current user
-    const snapshot = await docsCol
-      .where("owner", "==", currentUser)
-      .get();
-    
-    const sharedSnapshot = await docsCol
-      .where("sharedWith", "array-contains", currentUser)
-      .get();
+    const docsCol = window.fs.collection(window.db, "documents");
+    const ownedQ  = window.fs.query(docsCol, window.fs.where("owner", "==", currentUser));
+    const sharedQ = window.fs.query(docsCol, window.fs.where("sharedWith", "array-contains", currentUser));
+
+    const [ownedSnap, sharedSnap] = await Promise.all([
+      window.fs.getDocs(ownedQ),
+      window.fs.getDocs(sharedQ)
+    ]);
 
     const docs = [];
-    
-    // Add owned documents
-    snapshot.forEach(doc => {
-      docs.push({ id: doc.id, ...doc.data() });
-    });
-    
-    // Add shared documents (avoid duplicates)
-    sharedSnapshot.forEach(doc => {
-      if (!docs.find(d => d.id === doc.id)) {
-        docs.push({ id: doc.id, ...doc.data() });
-      }
+    ownedSnap.forEach(d => docs.push({ id: d.id, ...d.data() }));
+    sharedSnap.forEach(d => {
+      if (!docs.find(x => x.id === d.id)) docs.push({ id: d.id, ...d.data() });
     });
 
     return docs;
@@ -2504,43 +2520,47 @@ async function loadDocuments() {
   }
 }
 
+
 // ============================================
 // FIX 2: Upload document with owner info
 // ============================================
-async function uploadDocument(file, metadata) {
-  const currentUser = getCurrentUserEmail();
-  if (!currentUser) {
-    throw new Error("User not logged in");
-  }
+async function uploadDocument(file, metadata = {}) {
+  const raw = getCurrentUserEmail();
+  const currentUser = raw ? normalizeEmail(raw) : null;
+  if (!currentUser) throw new Error("User not logged in");
 
+  // Generate our doc ID so UI and Firestore use the same one
+  const newId = crypto.randomUUID();
+
+  let downloadURL = null;
   try {
-    // Upload file to storage
-    const storageRef = window.fs.ref(`documents/${currentUser}/${Date.now()}_${file.name}`);
-    const uploadTask = await storageRef.put(file);
-    const downloadURL = await uploadTask.ref.getDownloadURL();
-
-    // Save document metadata to Firestore with owner
-    const docData = {
-      ...metadata,
-      owner: currentUser,  // CRITICAL: Tag with owner
-      downloadURL: downloadURL,
-      fileName: file.name,
-      fileSize: file.size,
-      fileType: file.type,
-      uploadedAt: new Date().toISOString(),
-      sharedWith: metadata.sharedWith || [],  // Initialize empty if not provided
-      deletedAt: null,
-      deletedBy: null
-    };
-
-    const docRef = await window.db.collection("documents").add(docData);
-    
-    return { id: docRef.id, ...docData };
-  } catch (error) {
-    console.error("Error uploading document:", error);
-    throw error;
+    if (window.storage) {
+      const storageRef = window.fs.ref(window.storage, `documents/${currentUser}/${newId}_${file.name}`);
+      const snap = await window.fs.uploadBytes(storageRef, file);
+      downloadURL = await window.fs.getDownloadURL(snap.ref);
+    }
+  } catch (e) {
+    console.warn("Storage upload skipped/failed:", e);
   }
+
+  const docRef = window.fs.doc(window.db, "documents", newId);
+  const docData = {
+    ...metadata,
+    owner: currentUser,
+    downloadURL: downloadURL || null,
+    fileName: file.name,
+    fileSize: file.size,
+    fileType: file.type,
+    uploadedAt: Date.now(),
+    sharedWith: Array.isArray(metadata.sharedWith) ? metadata.sharedWith : [],
+    deletedAt: null,
+    deletedBy: null
+  };
+
+  await window.fs.setDoc(docRef, docData, { merge: true });
+  return { id: newId, ...docData };
 }
+
 
 // ============================================
 // FIX 3: Load shared folders with user filtering

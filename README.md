@@ -7,6 +7,10 @@ This React project preserves your original **logic, keywords, and styles**.
 
 ## Run
 ```bash
+
+install node 18+
+open terminal and run:
 npm install
-npm run dev
+npm run build
+npm run preview 
 ```

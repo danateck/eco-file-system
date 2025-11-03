@@ -1,0 +1,443 @@
+
+<!-- PDF.js מהפרויקט המקומי שלנו -->
+
+
+
+
+<!-- Tesseract.js ל-OCR -->
+
+
+
+
+
+
+  <div class="dashboard">
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="sidebar" id="sidebarDrawer">
+      <div>
+        <div class="brand-block">
+  <div class="brand-row">
+    <div class="brand-name">EcoDocs</div>
+    <button id="closeMenuBtn" class="close-btn" aria-label="סגור">✕</button>
+  </div>
+
+  <div class="brand-sub">ארכיון חכם • שמור • אישי</div>
+</div>
+        
+
+        <div class="user-panel">
+          <div class="user-panel-name" id="currentUserLabel">שלום, משתמש!</div>
+          <div class="user-panel-mail" id="currentUserEmail">user@example.com</div>
+        </div>
+
+        <nav class="menu">
+          <div class="menu-label">ניווט</div>
+
+          <button class="menu-item active" data-view="home">
+            <div class="menu-item-icon">🏠</div>
+            <span>דף הבית</span>
+          </button>
+
+          <button class="menu-item" data-view="shared">
+            <div class="menu-item-icon">🤝</div>
+            <span>אחסון משותף</span>
+          </button>
+
+          <button class="menu-item" data-view="recycle">
+            <div class="menu-item-icon">🗑️</div>
+            <span>סל מחזור</span>
+            
+          </button>
+          <button class="menu-item" data-view="settings">
+            <div class="menu-item-icon">⚙️</div>
+            <span>הגדרות</span>
+            
+          </button>
+
+          
+          
+        </nav>
+      </div>
+
+      <div class="sidebar-bottom">
+        <button class="logout-btn" id="logoutBtn">התנתקות</button>
+      </div>
+    </aside>
+
+    <!-- ===== MAIN AREA ===== -->
+    <section class="main-area">
+      <!-- בר עליון -->
+      <header class="top-bar">
+        <div class="top-left">
+          <h1 style="color: #000000; font-size:large;" class="page-title">הארכיון שלי</h1>
+          <h1 style="color: #000000; font-size:small;" class="page-title">כל המסמכים שלך במקום אחד</h1>
+        </div>
+
+        <div class="top-right">
+
+          
+  <!-- כפתור פרימיום חדש -->
+  <button class="premium-btn" id="premiumBtn"> פרימיום</button>
+  <!-- תפריט מובייל -->
+  <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
+
+  <!-- Logout במובייל -->
+  <button class="logout-btn mobile-logout" id="mobileLogoutBtn">🚪 התנתקות</button>
+
+  <!-- כפתור העלאת קובץ -->
+  <button class="upload-btn" id="uploadBtn">📤 העלה מסמך</button>
+  <input
+    type="file"
+    id="fileInput"
+    class="hidden-input"
+    accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.bmp,.doc,.docx"
+  />
+
+</div>
+
+      </header>
+
+      <!-- טאבים (משתמשת בהמשך בעיקר למיון/תצוגה) -->
+      <div class="tabs-bar">
+        <button class="tab-btn active" data-sort="category">לפי קטגוריה</button>
+        <button class="tab-btn" data-sort="year">לפי שנה</button>
+        <button class="tab-btn" data-sort="org">לפי ארגון</button>
+        <button class="tab-btn" data-sort="recipient">לפי נמען</button>
+      </div>
+
+      <!-- אזור התוכן -->
+      <div class="content-scroll-area">
+        <!-- מסך בית: כרטיסי תיקיות -->
+        <section class="home-view" id="homeView">
+          <h2 class="view-title">התיקיות שלך</h2>
+          <div class="folder-grid" id="folderGrid"></div>
+        </section>
+
+        <!-- מסך קטגוריה -->
+        <section class="category-view hidden" id="categoryView">
+          <div class="category-view-header">
+            <button class="back-button" id="backButton">⬅ חזרה</button>
+            <h2 class="category-title" id="categoryTitle">שם תיקייה</h2>
+
+            <!-- שומר את אותו select כמו שהיה לך, + שתי אפשרויות מיון לפי אחריות -->
+            <select id="sortSelect" style="margin-right:auto; font-size:.75rem; padding:.4rem .5rem; border-radius:6px;">
+              <option value="uploadedAt-desc">תאריך העלאה (חדש בהתחלה)</option>
+              <option value="uploadedAt-asc">תאריך העלאה (ישן בהתחלה)</option>
+              <option value="org-asc">לפי ארגון א→ת</option>
+              <option value="org-desc">לפי ארגון ת→א</option>
+              <option value="year-desc">שנה (חדש קודם)</option>
+              <option value="year-asc">שנה (ישן קודם)</option>
+              <option value="title-asc">שם קובץ א→ת</option>
+              <option value="title-desc">שם קובץ ת→א</option>
+              <option value="warrantyStart-desc">תאריך קנייה (חדש קודם)</option>
+              <option value="warrantyStart-asc">תאריך קנייה (ישן קודם)</option>
+              <option value="warrantyExpiresAt-asc">פג תוקף אחריות (מוקדם קודם)</option>
+              <option value="warrantyExpiresAt-desc">פג תוקף אחריות (מאוחר קודם)</option>
+            </select>
+          </div>
+
+          <div class="docs-list" id="docsList"></div>
+        </section>
+
+
+        <!-- === אחסון משותף === -->
+<section class="shared-view hidden" id="sharedView">
+  <div class="shared-container">
+
+    <!-- בלוק ראשון: בקשות ממתינות -->
+    <section class="shared-block pending-wrap">
+      <div class="cozy-head">
+        <h3>בקשות ממתינות</h3>
+      </div>
+      <div id="pendingList" class="sf-list">
+        <!-- כאן ייכנסו בקשות ממתינות -->
+      </div>
+    </section>
+
+    <!-- בלוק שני: תיקיות משותפות -->
+    <section class="shared-block folders-wrap">
+      <div class="cozy-head">
+        <h3>תיקיות משותפות</h3>
+        <button class="btn-cozy" id="createSharedFolderBtn">➕ צור תיקייה משותפת</button>
+      </div>
+      <div id="sharedFoldersGrid" class="docs-list shared-mode">
+        <!-- כאן ייכנסו התיקיות -->
+      </div>
+    </section>
+
+    <!-- בלוק שלישי: מסמכים משותפים -->
+    <section class="shared-block documents-wrap">
+      <div class="cozy-head">
+        <h3>מסמכים משותפים</h3>
+      </div>
+      <div id="sharedDocsList" class="docs-list shared-mode">
+        <!-- כאן ייכנסו המסמכים -->
+      </div>
+    </section>
+
+  </div>
+</section>
+
+
+      </div>
+    </section>
+  </div><!-- /dashboard -->
+
+  <!-- התראות צפות -->
+  <div id="notification" class="notification hidden"></div>
+
+  <!-- עורך מסמך -->
+<!-- עורך מסמך -->
+<div id="editModal" class="hidden" style="
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  font-family: 'Rubik', system-ui, sans-serif;
+">
+  <div style="
+    background: #fff;
+    color: #000;
+    min-width: 320px;
+    max-width: 90vw;
+    width: 400px;
+    border-radius: 12px;
+    box-shadow: 0 20px 40px rgba(0,0,0,.4);
+    padding: 1rem 1rem 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+  ">
+
+    <h2 style="margin:0; font-size:.9rem; font-weight:600; color:#000;">
+      עריכת פרטי המסמך
+    </h2>
+
+    <form id="editForm" style="display:flex; flex-direction:column; gap:.5rem; font-size:.8rem;">
+
+      <label>
+        שם קובץ:
+        <input id="edit_title" type="text" style="width:100%; padding:.4rem; border-radius:6px; border:1px solid #bbb;">
+      </label>
+
+      <label>
+        ארגון:
+        <input id="edit_org" type="text" style="width:100%; padding:.4rem; border-radius:6px; border:1px solid #bbb;">
+      </label>
+
+      <label>
+        שנה:
+        <input id="edit_year" type="number" style="width:100%; padding:.4rem; border-radius:6px; border:1px solid #bbb;">
+      </label>
+
+      <label>
+        שייך ל (מופרד בפסיקים):
+        <input id="edit_recipient" type="text" style="width:100%; padding:.4rem; border-radius:6px; border:1px solid #bbb;">
+      </label>
+
+      <label>
+        תאריך קנייה / התחלה (yyyy-mm-dd):
+        <input id="edit_warrantyStart" type="date" style="width:100%; padding:.4rem; border-radius:6px; border:1px solid #bbb;">
+      </label>
+
+      <label>
+        תוקף אחריות עד (yyyy-mm-dd):
+        <input id="edit_warrantyExpiresAt" type="date" style="width:100%; padding:.4rem; border-radius:6px; border:1px solid #bbb;">
+      </label>
+
+      <label>
+        מחיקה אוטומטית אחרי (yyyy-mm-dd):
+        <input id="edit_autoDeleteAfter" type="date" style="width:100%; padding:.4rem; border-radius:6px; border:1px solid #bbb;">
+      </label>
+
+      <label>
+        קטגוריה:
+        <input id="edit_category" type="text" style="width:100%; padding:.4rem; border-radius:6px; border:1px solid #bbb;">
+      </label>
+
+      <label>
+        שותף עם (אימיילים בפסיקים):
+        <input id="edit_sharedWith" type="text" style="width:100%; padding:.4rem; border-radius:6px; border:1px solid #bbb;">
+      </label>
+
+      <div style="display:flex; gap:.5rem; margin-top:.75rem; justify-content:flex-end;">
+        <button type="button" id="editCancelBtn"
+          style="background:#b63a3a; color:#fff; border:0; border-radius:6px; font-weight:600; padding:.5rem .75rem; cursor:pointer;">
+          ביטול
+        </button>
+
+        <button type="submit" id="editSaveBtn"
+          style="background:#0e3535; color:#fff; border:0; border-radius:6px; font-weight:600; padding:.5rem .75rem; cursor:pointer;">
+          שמירה
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+
+<div id="loading-overlay" class="loading-overlay hidden ">
+  <div class="loading-stack">
+    <div class="tetro-frame">
+      <div class="tetrominos">
+        <div class="tetromino box1"></div>
+        <div class="tetromino box2"></div>
+        <div class="tetromino box3"></div>
+        <div class="tetromino box4"></div>
+      </div>
+    </div>
+    <p class="loading-text">מזהה טקסט... אנא המתיני</p>
+  </div>
+</div>
+
+
+
+<!-- Premium Panel (Modal) -->
+<div id="premiumPanel" class="modal-backdrop hidden" dir="rtl" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="premiumTitle" tabindex="-1">
+    <div class="modal-head">
+      <h2 id="premiumTitle">בחרו תוכנית</h2>
+      <button class="modal-close" id="premiumCloseBtn" aria-label="סגור">✖</button>
+    </div>
+
+
+     <div class="scroll-area">
+    <p class="muted">שדרגו את Eco-Files כדי לקבל עוד שטח אחסון, שיתופים ללא הגבלה ותכונות חכמות.</p>
+
+    <div class="plans-grid">
+      <!-- Free -->
+      <article class="plan" data-plan="free" aria-label="תוכנית חינם">
+        <header>
+          <h3>חינם</h3>
+          <div class="price">₪0<span class="per">/חודש</span></div>
+        </header>
+        <ul class="features">
+          <li>אחסון עד 1GB</li>
+          <li>תיקייה משותפת אחת</li>
+          <li>העלאות בסיסיות</li>
+        </ul>
+        <button class="btn btn-ghost" disabled>נוכחי</button>
+      </article>
+
+      <!-- Pro -->
+      <article class="plan" data-plan="pro" aria-label="תוכנית פרו">
+        <header>
+          <h3>פרו</h3>
+          <div class="price">₪11<span class="per">/חודש</span></div>
+        </header>
+        <ul class="features">
+          <li>אחסון עד 10GB</li>
+          <li>שיתוף עד 5 משתמשים</li>
+          <li>תיוגים וחיפוש חכם</li>
+          <li>OCR מהיר</li>
+        </ul>
+        <button class="btn" data-select-plan="pro">בחר פרו</button>
+      </article>
+
+      <!-- Premium -->
+      <article class="plan plan-accent" data-plan="premium" aria-label="תוכנית פרימיום">
+        <header>
+          <h3>פרימיום 💎</h3>
+          <div class="price">₪29<span class="per">/חודש</span></div>
+        </header>
+        <ul class="features">
+          <li>אחסון בלתי מוגבל</li>
+          <li>שיתוף ללא הגבלה</li>
+          <li>AI סיווג וסריקה אוטומטית</li>
+          <li>סנכרון בזמן אמת ותמיכה בעדיפות</li>
+        </ul>
+        <button class="btn btn-accent" data-select-plan="premium">בחר פרימיום</button>
+      </article>
+    </div>
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn" id="premiumLaterBtn">אולי אחר-כך</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Settings Panel -->
+<div id="settingsPanel" class="modal-backdrop hidden" dir="rtl" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" tabindex="-1">
+    <header class="modal-head">
+      <h2 id="settingsTitle">הגדרות</h2>
+      <button class="icon-btn" data-close aria-label="סגור">
+        ✖
+      </button>
+    </header>
+
+    <div class="scroll-area">
+      <!-- Appearance -->
+      <section class="section">
+        <h3 class="section-title">מראה</h3>
+
+        <!-- Theme chooser -->
+        <!-- Theme chooser -->
+<div class="card">
+  <label class="block-label">ערכת צבע</label>
+  <div class="theme-row" role="radiogroup" aria-label="Theme">
+    <label class="pill">
+      <input type="radio" name="theme" value="light" id="themeLight">
+      <span>מצב בהיר</span>
+    </label>
+    <label class="pill">
+      <input type="radio" name="theme" value="dark" id="themeDark">
+      <span>מצב כהה</span>
+    </label>
+  </div>
+</div>
+
+        
+      </section>
+
+      <!-- Behavior -->
+      <section class="section">
+        <h3 class="section-title">התנהגות</h3>
+        <div class="grid-2">
+          <div class="card">
+            <label class="block-label">מחיקה</label>
+            <label class="switch">
+              <input type="checkbox" id="toggleConfirmDelete">
+              <span class="switch-ui"></span>
+              <span class="switch-text">אישור לפני מחיקה</span>
+            </label>
+            <p class="hint">יבקש אישור לפני מחיקת קובץ או תיקייה.</p>
+          </div>
+
+         
+        </div>
+      </section>
+    </div>
+
+    <footer class="modal-foot">
+      <button class="btn" data-close>סגור</button>
+    </footer>
+  </div>
+</div>
+
+
+
+
+
+
+  <!-- סקריפט עזר UI (כניסה/יציאה/ניווט בתפריט) -->
+  
+
+
+
+<!-- Import map for bare imports used by firebase-config.js -->
+
+
+<!-- Initialize Firebase (v10 ESM) and expose window.db / window.fs -->
+
+
+<!-- Your app AFTER Firebase globals exist -->
+
+
+

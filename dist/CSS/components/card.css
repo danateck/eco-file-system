@@ -1,0 +1,115 @@
+/* card css  */
+.job-listing-card-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    max-width: var(--max-width);
+    margin-inline: auto;
+    margin-block-start: 4rem;
+    padding-inline: .5rem;
+}
+
+
+.job-listing-card {
+    border-left: 4px solid var(--clr-primary-green);
+    background-color: var(--clr-white);
+    padding-inline: 1rem;
+    padding-block: .5rem;
+    border-radius: .2rem;
+    width: 100%;
+
+    box-shadow: var(--box-shadow);
+}
+
+.company-logo img {
+    width: 80px;
+}
+
+.job-listing-card__details h1 {
+    font-size: 1.2rem;
+    margin: 0;
+}
+
+.job-listing-card__details ul {
+    display: flex;
+    gap: 1rem;
+    padding-left: 0;
+}
+
+.filter-list-container {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 1rem;
+}
+
+.filter-list-container p {
+    padding: .3rem;
+    background-color: var(--clr-green-50);
+    color: var(--clr-primary-green);
+    font-weight: var(--font-weight-bold);
+    cursor: pointer;
+    margin: 0;
+
+    transition: background-color 0.2s ease-in-out;
+}
+
+.filter-list-container p:hover{
+    background-color: var(--clr-primary-green);
+    color: var(--clr-green-50);
+}
+
+.company-name {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+
+.company-name .name {
+    font-weight: var(--font-weight-bold);
+    font-size: 1rem;
+    padding-right: .5rem;
+}
+
+.company-name .new,
+.company-name .featured {
+    color: var(--clr-white);
+    padding: .3rem .5rem .2rem .5rem;
+    border-radius: 100vw;
+    text-transform: uppercase;
+}
+
+ul li {
+    list-style-type: disc;
+    color: var(--clr-green-400);
+    padding-right: .5rem;
+    font-weight: var(--font-weight-medium);
+}
+
+ul li:nth-child(1) {
+    list-style-type: none;
+}
+
+@media (min-width: 800px) {
+    .job-listing-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+}
+
+
+@media (min-width: 400px) {
+    .job-listing-card__details {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    hr {
+        display: none;
+    }
+
+    .job-listing-card-container {
+        padding: 1rem;
+    }
+}

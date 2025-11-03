@@ -1,0 +1,27 @@
+/* custom variables  */
+:root {
+    /* COLORS  */
+    --clr-primary-green: hsl(180, 29%, 50%);
+
+    --clr-green-900: hsl(180, 14%, 20%);
+    --clr-green-400: hsl(180, 8%, 52%);
+    --clr-green-50: hsl(180, 52%, 96%);
+    --clr-body-bg: var(--clr-green-50);
+
+    --clr-white: hsl(0, 0%, 100%);
+    --clr-black: hsl(0, 0%, 0%);
+
+    /* TYPOGRAPHY  */
+    --font-size-body: 15px;
+    --font-family-base: "League Spartan", sans-serif;
+
+    --font-weight-medium: 500;
+    --font-weight-bold: 700;
+
+    /* LAYOUT  */
+    --max-width: 950px;
+
+    /* BOX SHADOW  */
+    --box-shadow: 0 6px 10px hsl(180, 8%, 82%);;
+}
+

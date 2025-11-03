@@ -1,0 +1,197 @@
+/* כל המסך יהיה RTL */
+body {
+    direction: rtl;
+    font-family: "League Spartan", system-ui, sans-serif;
+    background-color: #e8f2f1;
+    color: #0e3535;
+    margin: 0;
+}
+
+/* סקשן הבית */
+.home-view {
+    max-width: 1100px;
+    margin-inline: auto;
+    padding: 2rem 1rem;
+}
+.view-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    color: #0e3535;
+}
+
+/* הגריד של התיקיות */
+.folder-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1.5rem;
+}
+
+/* כרטיס תיקייה */
+.folder-card {
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: transparent;
+    border: none;
+    outline: none;
+}
+
+.folder-icon {
+    width: 90px;
+    height: 60px;
+    border-radius: 6px 6px 3px 3px;
+    background-color: #ffd95a;              /* צהוב תיקייה */
+    border: 2px solid #c7a749;               /* מסגרת */
+    box-shadow: 0 6px 12px rgba(0,0,0,0.12);
+
+    position: relative;
+}
+
+/* הלשונית העליונה של התיקייה */
+.folder-icon::before {
+    content: "";
+    position: absolute;
+    top: -10px;
+    right: 10px;
+    width: 40px;
+    height: 12px;
+    border-radius: 4px 4px 0 0;
+    background-color: #ffd95a;
+    border: 2px solid #c7a749;
+    border-bottom: 0;
+}
+
+/* שם התיקייה מתחת לאייקון */
+.folder-label {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #0e3535;
+    text-align: center;
+}
+
+/* מסך הקטגוריה */
+.category-view {
+    max-width: 1100px;
+    margin-inline: auto;
+    padding: 2rem 1rem;
+}
+
+.category-view-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.back-button {
+    background: #0e3535;
+    color: #fff;
+    border: 0;
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.category-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #0e3535;
+}
+
+/* רשימת המסמכים בתוך תיקיה */
+.docs-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+/* כרטיס מסמך */
+.doc-card {
+    background: #fff;
+    border-radius: 8px;
+    border: 1px solid rgba(0,0,0,0.07);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.07);
+    padding: 1rem 1.25rem;
+}
+
+.doc-card-title {
+    font-weight: 600;
+    font-size: 1rem;
+    color: #0e3535;
+    margin: 0 0 .25rem;
+}
+
+.doc-card-meta {
+    font-size: 0.8rem;
+    color: #375b5b;
+    margin: 0 0 .5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 1rem;
+}
+
+.doc-open-link {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: underline;
+    color: #0e3535;
+}
+
+/* utility */
+.hidden {
+    display: none !important;
+}
+
+
+
+.upload-bar {
+    margin-bottom: 1.5rem;
+    display: flex;
+    justify-content: flex-start;
+}
+
+.upload-btn {
+    background-color: #0e3535;
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border: 0;
+    border-radius: 6px;
+    padding: 0.6rem 1rem;
+    cursor: pointer;
+}
+
+.upload-btn:hover {
+    opacity: 0.9;
+}
+
+
+.notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background-color: #0e3535;
+  color: #fff;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: all 0.3s ease;
+  z-index: 1000;
+}
+
+.notification.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.notification.error {
+  background-color: #b63a3a;
+}

@@ -1,0 +1,56 @@
+/* reset.css — clean & minimal version */
+
+/* Box sizing */
+* {
+  box-sizing: border-box;
+}
+
+/* Remove default margin and padding */
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+/* Set default body styles */
+
+
+body {
+    font-size: var(--font-size-body);
+    font-family: var(--font-family-base);
+    background-color: var(--clr-body-bg);
+    line-height: var(--line-height);
+}
+
+/* Media elements */
+img{
+  display: block;
+  max-width: 100%;
+}
+
+/* Form elements inherit fonts */
+input,
+button,
+textarea,
+select {
+  font: inherit;
+}
+
+/* Remove list styles */
+ul,
+ol {
+  list-style: none;
+}
+
+/* Links */
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Buttons */
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+

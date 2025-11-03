@@ -1,0 +1,39 @@
+
+/* utility classes */
+.flex {
+    display: flex;
+}
+
+.items-center {
+    align-items: center;
+}
+
+.justify-between {
+    justify-content: space-between;
+}
+
+.flex-center {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.text-primary-green {
+    color: var(--clr-primary-green);
+}
+
+.text-green-900 {
+    color: var(--clr-green-900);
+}
+
+.text-green-400 {
+    color: var(--clr-green-400);
+}
+
+.bg-green-900 {
+    background-color: var(--clr-green-900);
+}
+
+.bg-primary-green {
+    background-color: var(--clr-primary-green);
+}

@@ -1,0 +1,2058 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EcoDocs Dashboard</title>
+
+
+<script src="/forms/eco-wellness/authCheck.js"></script>
+  
+  <!-- פונט -->
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- ה-CSS שלך -->
+  <link rel="stylesheet" href="/CSS/main.css" />
+
+  <style>
+
+
+
+
+
+    .doc-actions{margin-top:auto;display:flex;gap:.5rem;flex-wrap:wrap}
+    .doc-action-btn{border:1px solid var(--border-soft);background:#fff;border-radius:6px;
+      padding:.35rem .55rem;font-size:.7rem;cursor:pointer}
+    .doc-action-btn.danger{border-color:#e7b3b3;color:#8a1f1f;background:#fff4f4}
+    .doc-action-btn.restore{border-color:#a3d6c1;color:#95a39f;background:#eefaf4}
+
+    :root {
+      --bg-app: #e1dbcf;
+      --bg-card: #e1dbcf;
+      --bg-sidebar-from: #2e2512;
+      --bg-sidebar-to: #271c0b;
+      --border-soft: rgba(91, 74, 56, 0.071);
+      --text-dark: #71716b;
+      --text-mid: #000000;
+      --accent-soft: #9a3939;
+      --accent-strong: #382e14;
+      --radius-lg: 16px;
+      --radius-md: 10px;
+      --radius-sm: 6px;
+      --shadow-card: 0 12px 32px rgba(0,0,0,0.08);
+      --shadow-topbar: 0 2px 6px rgba(0,0,0,0.08);
+      --shadow-btn: 0 6px 16px rgba(0,0,0,0.18);
+      --grad-btn: linear-gradient(to right, #3a7f5d, #5dbb8d);
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg-app);
+      font-family: "Rubik", system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: var(--text-dark);
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* ====== LAYOUT ====== */
+    .dashboard {
+      display: flex;
+      width: 100%;
+      min-height: 100vh;
+      position: relative;
+    }
+
+    .sidebar {
+      background: linear-gradient(180deg, var(--bg-sidebar-from) 0%, var(--bg-sidebar-to) 100%);
+      color: #fff;
+      width: 240px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      height: 100vh;
+      position: relative;
+      box-shadow: 4px 0 16px rgba(0,0,0,0.3);
+      padding: 1rem 1rem 0;
+      overflow-y: auto; /* גלילה אם התוכן גבוה */
+    }
+
+    .sidebar > div {
+      flex-shrink: 0;
+    }
+
+    .sidebar-bottom {
+      position: absolute;
+      bottom: 1.56rem;
+      left: 0;
+      width: 100%;
+      padding: 0 1rem;
+      box-sizing: border-box;
+      border-top: 1px solid rgba(255,255,255,0.12);
+    }
+
+    .logout-btn {
+      width: 100%;
+      border: 0;
+      border-radius: var(--radius-md);
+      background: rgba(255,255,255,0.12);
+      color: #fff;
+      font-family: "Rubik", system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-weight: 600;
+      font-size: .9rem;
+      padding: .8rem .75rem;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(0,0,0,.4);
+      transition: background .18s, filter .18s;
+    }
+    .logout-btn:hover {
+      background: rgba(255,255,255,0.18);
+      filter: brightness(1.05);
+    }
+
+    /* מובייל: המגירה */
+    @media (max-width: 760px) {
+      .sidebar {
+             position: fixed;
+  top: 0;
+  right: 0; /* slide in/out from the right side */
+      box-shadow: 4px 0 16px rgba(0,0,0,0.3);
+      padding: 1rem 1rem 0;
+      overflow-y: auto; /* גלילה אם התוכן גבוה */
+      transform: translateX(100%); /* start off-screen to the right */
+  transition: transform 0.35s ease-in-out;
+        top: 0;
+        right: 0;
+        height: 100vh;
+        max-height: 100vh;
+        width: 220px;
+        max-width: 80%;
+        box-shadow: 0 0 30px rgba(0,0,0,0.6);
+        z-index: 9999;
+        background: linear-gradient(180deg, var(--bg-sidebar-from) 0%, var(--bg-sidebar-to) 100%);
+        transform: translateX(100%);
+      }
+      .sidebar.open {
+        transform: translateX(0);
+      }
+    }
+
+    .brand-block {
+      display: flex;
+      flex-direction: column;
+      gap: .5rem;
+      padding: .5rem .25rem 1rem;
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+    }
+
+    .brand-name {
+      font-size: .9rem;
+      font-weight: 600;
+      color: #fff;
+      letter-spacing: .03em;
+      line-height: 1.2;
+    }
+
+    .brand-sub {
+      font-size: .7rem;
+      font-weight: 400;
+      color: rgba(255,255,255,.7);
+      line-height: 1.4;
+    }
+
+    .user-panel {
+      margin-top: .75rem;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: var(--radius-md);
+      padding: .6rem .75rem;
+      font-size: .8rem;
+      line-height: 1.4;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      gap: .25rem;
+    }
+
+    .user-panel-name {
+      font-weight: 500;
+      color: #fff;
+      font-size: .8rem;
+    }
+
+    .user-panel-mail {
+      color: rgba(255,255,255,.7);
+      font-size: .7rem;
+      direction: ltr;
+      unicode-bidi: plaintext;
+      word-break: break-all;
+    }
+
+
+
+    .hidden { display: none !important; }
+
+/* Backdrop allows scroll on small screens */
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.45);
+  z-index: 9999;
+  overflow: auto;
+  padding: 16px;
+  min-height: 100dvh;
+}
+.modal {
+  background: var(--c-bg,#fff);
+  color: var(--c-fg,#0f141a);
+  width: min(720px, 94vw);
+  margin: 24px auto;
+  border-radius: 14px;
+  box-shadow: 0 18px 40px rgba(0,0,0,.28);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  max-height: 88dvh;
+  overflow: hidden;
+}
+.modal-head {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 16px; position:sticky; top:0; background:var(--c-bg,#fff);
+  border-bottom:1px solid var(--c-border,#e6e6e6); z-index:1;
+}
+.modal-head h2{margin:0;font-size:1.2rem}
+.modal-close{border:0;background:transparent;cursor:pointer;font-size:1.1rem;color:var(--c-fg,#0f141a)}
+.scroll-area{overflow:auto;-webkit-overflow-scrolling:touch;padding:10px 16px; margin-right: 20px;}
+.modal-foot{padding:10px 16px 14px;border-top:1px solid var(--c-border,#e6e6e6);position:sticky;bottom:0;background:var(--c-bg,#fff)}
+
+.section{margin:10px 0 16px}
+.section h3{margin:0 0 8px;font-size:1rem;opacity:.9}
+.row{display:flex;align-items:center;gap:10px;margin:10px 0}
+.switch input{margin-inline-end:8px}
+
+select, .btn{
+  padding:8px 12px;border-radius:10px;border:1px solid var(--c-border,#e6e6e6);
+  background:var(--c-btn,#f2f2f2); color:var(--c-fg,#0f141a);
+}
+.btn{cursor:pointer}
+
+/* Compact density: you can hook your cards/list to this class */
+.compact-density .doc-card{padding:8px !important}
+.compact-density .grid{gap:8px !important}
+
+/* Reduce motion */
+.reduce-motion *{animation:none!important;transition:none!important}
+
+/* Theme tokens (light default) + dark */
+:root{
+  --c-bg:#ffffff; --c-fg:#0f141a; --c-border:#e6e6e6; --c-btn:#f2f2f2;
+}
+.theme-dark{
+  --c-bg:#111417; --c-fg:#e8eef5; --c-border:#2a2f35; --c-btn:#1d232a;
+}
+
+/* Mobile */
+@media (max-width:560px){
+  .modal{width:100%;margin:0 auto;max-height:100dvh;border-radius:0}
+}
+
+    nav.menu {
+      display: flex;
+      flex-direction: column;
+      padding-top: 1rem;
+      gap: .25rem;
+    }
+
+    .menu-label {
+      color: rgba(255,255,255,.5);
+      font-size: .7rem;
+      font-weight: 500;
+      letter-spacing: .05em;
+      padding: 0 .5rem;
+      margin-bottom: .25rem;
+    }
+
+    .menu-item {
+      background: transparent;
+      border: none;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      padding: .6rem .5rem .6rem .75rem;
+      border-radius: var(--radius-md);
+      font-weight: 500;
+      font-size: .8rem;
+      cursor: pointer;
+      text-align: right;
+      width: 100%;
+      transition: background .18s;
+    }
+
+    .menu-item:hover,
+    .menu-item.active {
+      background: rgba(255,255,255,0.12);
+    }
+
+    .menu-item-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-md);
+      background: rgba(255,255,255,0.12);
+      display: grid;
+      place-items: center;
+      font-size: .8rem;
+      font-weight: 500;
+    }
+
+    .main-area {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      max-height: 100vh;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      align-items: center;
+      background: #7d9166;
+      padding: .8rem 1rem;
+      box-shadow: var(--shadow-topbar);
+      border-bottom: 1px solid var(--border-soft);
+      z-index: 5;
+    }
+
+    .top-left {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .page-title {
+      margin: 0;
+      font-size: .95rem;
+      font-weight: 600;
+      color: var(--text-dark);
+      line-height: 1.3;
+    }
+
+    .page-sub {
+      margin: 0;
+      font-size: .7rem;
+      color: var(--text-mid);
+      line-height: 1.4;
+    }
+
+    .top-right {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: .5rem;
+    }
+
+    .mobile-menu-btn {
+      display: none;
+      background: transparent;
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-sm);
+      font-size: 1rem;
+      line-height: 1;
+      padding: .4rem .6rem;
+      cursor: pointer;
+      color: var(--text-dark);
+      background-color: #301919;
+      box-shadow: 0 4px 10px rgba(0,0,0,.1);
+    }
+
+    .upload-btn {
+      background: #301919;
+      color: #b4b1b1;
+      font-family: "Rubik", system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      border: 0;
+      border-radius: var(--radius-md);
+      font-size: .8rem;
+      font-weight: 600;
+      padding: .55rem .8rem;
+      cursor: pointer;
+      box-shadow: var(--shadow-btn);
+      transition: filter .18s, transform .18s;
+    }
+    .upload-btn:hover {
+      filter: brightness(1.05);
+      transform: translateY(-1px);
+    }
+
+    .hidden-input {
+      display: none;
+    }
+
+    .tabs-bar {
+      background: #2b260b;
+      border-bottom: 1px solid #d6e6df;
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+      padding: .6rem 1rem;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: 0;
+      border-radius: var(--radius-sm);
+      font-size: .75rem;
+      font-weight: 500;
+      padding: .4rem .7rem;
+      cursor: pointer;
+      color: var(--text-dark);
+      line-height: 1.2;
+      transition: background .15s;
+    }
+
+    .tab-btn.active,
+    .tab-btn:hover {
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+    }
+
+    .content-scroll-area {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 1rem;
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      row-gap: 1rem;
+    }
+
+    .home-view,
+    .category-view {
+      background: transparent;
+      border-radius: var(--radius-lg);
+    }
+
+    .view-title {
+      font-size: .9rem;
+      font-weight: 600;
+      color: var(--text-dark);
+      margin: 0 0 .75rem;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+
+    .folder-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      align-items: start;
+      justify-items: center;
+    }
+
+    @media (min-width: 500px) {
+      .folder-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+    @media (min-width: 700px) {
+      .folder-grid {
+        grid-template-columns: repeat(4, 1fr);
+      }
+    }
+    @media (min-width: 1000px) {
+      .folder-grid {
+        grid-template-columns: repeat(5, 1fr);
+      }
+    }
+    @media (min-width: 1300px) {
+      .folder-grid {
+        grid-template-columns: repeat(6, 1fr);
+      }
+    }
+
+    .folder-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-md);
+      padding: 2.2rem 3rem;
+      box-shadow: var(--shadow-card);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: .7rem;
+      transition: transform .18s, box-shadow .18s;
+      text-align: right;
+      width: 100%;
+      max-width: 320px;
+    }
+    .folder-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 16px 32px rgba(0,0,0,0.12);
+    }
+
+    .folder-icon {
+      width: 40px;
+      height: 32px;
+      border-radius: 6px;
+      background: linear-gradient(135deg,#fdd868 0%,#ffc94d 100%);
+      box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+      position: relative;
+    }
+    .folder-icon::before {
+      content: "";
+      position: absolute;
+      top: -6px;
+      right: 4px;
+      width: 18px;
+      height: 8px;
+      border-radius: 3px 3px 0 0;
+      background: linear-gradient(135deg,#efe5b6 0%,#ffe694 100%);
+      box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+    }
+
+    .folder-label {
+      font-size: .8rem;
+      font-weight: 600;
+      color: var(--text-dark);
+      line-height: 1.3;
+      font-family: "Rubik", system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .category-view-header {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      margin-bottom: .75rem;
+    }
+
+    .back-button {
+      background: transparent;
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-sm);
+      padding: .4rem .6rem;
+      font-size: .7rem;
+      cursor: pointer;
+      color: var(--accent-strong);
+      background-color: #fff;
+      transition: box-shadow .18s;
+    }
+    .back-button:hover {
+      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+    }
+
+    .category-title {
+      font-size: .85rem;
+      font-weight: 600;
+      color: var(--text-dark);
+      margin: 0;
+    }
+
+    .docs-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px,1fr));
+      gap: 1rem;
+      justify-items: center;
+    }
+
+
+    
+    .doc-card {
+      background: var(--bg-card);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-soft);
+      box-shadow: var(--shadow-card);
+      padding: .8rem .8rem .9rem;
+      font-size: .8rem;
+      line-height: 1.4;
+      color: var(--text-dark);
+      display: flex;
+      flex-direction: column;
+      gap: .5rem;
+      width: 100%; max-width: none; 
+      min-height: 140px;
+      position: relative;
+    }
+
+    .doc-card-title {
+      font-weight: 600;
+      font-size: .8rem;
+      margin: 0;
+      color: var(--text-dark);
+    }
+
+    .doc-card-meta {
+      font-size: .7rem;
+      color: var(--text-mid);
+      line-height: 1.4;
+      display: flex;
+      flex-direction: column;
+      gap: .25rem;
+    }
+
+    .doc-open-link {
+      font-size: .8rem;
+      font-weight: 600;
+      color: #d9d9d9;
+      text-decoration: none;
+      background: #000;
+      padding: .5rem .9rem;
+      width: fit-content;
+      border-radius: var(--radius-sm);
+      box-shadow: 0 6px 14px rgba(0,0,0,0.25);
+      transition: background .18s, color .18s;
+      display: inline-block;
+    }
+    .doc-open-link:hover {
+      background: #222;
+      color: #ffffff;
+    }
+
+
+
+/* header row: title on right, X on left (works great in RTL, too) */
+.brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* pushes title to right, X to left */
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #ddd;
+}
+
+.brand-name {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+/* the X button */
+.close-btn {
+  background: transparent;
+  border: none;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #555;
+  padding: 4px 6px;
+  border-radius: 10px;
+  transition: background-color .15s ease, color .15s ease;
+}
+.close-btn:hover { background: rgba(0,0,0,0.06); color: #e53935; }
+
+/* optional dark mode variants */
+body.dark-mode .brand-row { border-bottom-color: #2b2b2b; }
+body.dark-mode .close-btn { color: #eee; }
+body.dark-mode .close-btn:hover { background: rgba(255,255,255,0.06); color: #ff7675; }
+
+
+/* when menu is open */
+.sidebar.open {
+  transform: translateX(0); /* slide into view */
+}
+
+/* optional dark mode support */
+body.dark-mode .sidebar {
+  background: #181a1b;
+  color: #eee;
+}
+
+
+
+
+
+.top-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.premium-btn {
+  background: linear-gradient(90deg, #bdc3bf, #bdc3bf);
+  border: none;
+  color: #1e1e1e;
+  font-weight: bold;
+  padding: 8px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.premium-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 10px rgba(54, 49, 24, 0.6);
+}
+
+/* ========== Responsive, scrollable modal ========== */
+.hidden { display: none !important; }
+
+/* Backdrop now scrolls if needed and pads content */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  z-index: 9999;
+
+  /* allow scroll on small screens */
+  overflow: auto;
+  padding: 16px;                 /* space around modal on tiny screens */
+  /* use modern viewport to avoid mobile address bar bugs */
+  min-height: 100dvh;            
+}
+
+/* Center via auto margins; cap height and allow inner scrolling */
+.modal {
+  background: var(--c-bg, #fff);
+  color: var(--c-fg, #0f141a);
+  width: min(920px, 94vw);
+  margin: 24px auto;             /* centers in the scrolling backdrop */
+  border-radius: 14px;
+  box-shadow: 0 18px 40px rgba(0,0,0,.28);
+
+  display: grid;
+  grid-template-rows: auto 1fr auto; /* head | content | foot */
+  gap: 12px;
+
+  max-height: 88dvh;             /* so it never overflows the screen */
+  overflow: hidden;              /* clip at container; content area scrolls */
+}
+
+/* Keep header/close visible while content scrolls */
+.modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  position: sticky; top: 0;
+  background: var(--c-bg, #fff);
+  z-index: 1;
+  border-bottom: 1px solid var(--c-border, #e6e6e6);
+}
+.modal-head h2 { margin: 0; font-size: 1.2rem; }
+.modal-close {
+  border: 0; background: transparent; cursor: pointer; font-size: 1.1rem;
+  color: var(--c-fg, #0f141a);
+}
+
+/* Scroll only the middle content area (text + plans) */
+.modal > .muted,
+.modal > .plans-grid {
+  padding: 0 16px;
+}
+.muted { opacity: .85; margin: 8px 0 10px; margin-right: 12px}
+
+/* Wrap content to be scrollable (1fr area) */
+.modal .scroll-area {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 0 10px;
+}
+
+/* Plans grid responsive */
+.plans-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 0 16px 6px;
+}
+.plan {
+  border: 1px solid var(--c-border, #e6e6e6);
+  background: var(--c-card, #f9f9f9);
+  border-radius: 12px;
+  padding: 12px;
+  display: grid; gap: 10px;
+}
+.plan header { display: flex; align-items: baseline; justify-content: space-between; }
+.plan h3 { margin: 0; }
+.price { font-size: 1.15rem; font-weight: 700; }
+.price .per { font-size: .9rem; opacity: .7; margin-inline-start: 4px; }
+.features { margin: 0; padding-inline-start: 18px; display: grid; gap: 4px; }
+
+/* Footer stays visible */
+.modal-foot {
+  padding: 10px 16px 14px;
+  border-top: 1px solid var(--c-border, #e6e6e6);
+  position: sticky; bottom: 0;
+  background: var(--c-bg, #fff);
+}
+
+/* Buttons */
+.btn {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--c-border, #e6e6e6);
+  background: var(--c-btn, #f2f2f2);
+  color: var(--c-fg, #0f141a);
+  cursor: pointer;
+  width: 100%;                 /* better for mobile tap targets */
+}
+.btn-ghost { background: transparent; }
+.btn-accent {
+  background: linear-gradient(90deg, #ffd700, #ffb300);
+  border: none; color: #222; font-weight: 700;
+}
+
+/* Premium accent card */
+.plan-accent {
+  border: 1px solid #ffd86b;
+  background: linear-gradient(180deg, #fff7d6, #fff);
+}
+
+/* ---------- Mobile tweaks ---------- */
+@media (max-width: 900px) {
+  .plans-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 560px) {
+  .modal { width: 100%; margin: 0 auto; border-radius: 0; max-height: 100dvh; }
+  .modal-head, .modal-foot { padding: 12px; }
+  .plans-grid { grid-template-columns: 1fr; padding: 0 12px 6px; }
+  .plan { padding: 10px; }
+}
+
+/* ---------- Dark theme tokens (if you use .theme-dark) ---------- */
+.theme-dark {
+  --c-bg: #111417;
+  --c-fg: #e8eef5;
+  --c-border: #2a2f35;
+  --c-card: #151a1f;
+  --c-btn: #1d232a;
+}
+
+/* Optional: better focus outline */
+:where(button, [href], input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid #7aa7ff;
+  outline-offset: 2px;
+}
+
+
+
+    .notification {
+      position: fixed;
+      top: 1rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(-10px);
+      background-color: #0e3535;
+      color: #fff;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      box-shadow: 0 12px 24px rgba(0,0,0,0.25);
+      opacity: 0;
+      transition: all 0.3s ease;
+      z-index: 9999;
+    }
+    .notification.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    .notification.error {
+      background-color: #b63a3a;
+    }
+    .notification.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 760px) {
+      .top-bar { border-radius: 0; }
+      .mobile-menu-btn { display: inline-block; }
+    }
+    @media (min-width: 761px) {
+      .mobile-menu-btn { display: none; }
+    }
+
+    .mobile-logout {
+      display: none;
+    }
+
+/* ==== Shared (Cozy) ==== */
+.shared-manage { display:grid; gap:16px; }
+
+.cozy-head {
+  display:flex; align-items:center; justify-content:space-between;
+  background:#2e2512; color:#d6e6df; border:1px solid #2d3b3b;
+  border-radius:14px; padding:12px 14px; box-shadow:0 12px 28px rgba(0,0,0,.22);
+}
+.cozy-head h3 { margin:0; font-size:1rem; font-weight:700; letter-spacing:.3px; }
+.btn-cozy {
+  background:#2e2512; color:#fff; border:1px solid #2e5a5a;
+  border-radius:10px; padding:.55rem .8rem; font-weight:600; cursor:pointer;
+  box-shadow:0 10px 24px rgba(0,0,0,.28); transition:.18s;
+}
+.btn-cozy:hover { filter:brightness(1.08); transform:translateY(-1px); }
+
+
+
+
+.sf-card {
+  width: 100% !important ;
+  max-width: 900px !important; /* מאפשר להם להיות רחבים מאוד */
+  display:grid; grid-template-columns:56px 1fr auto; gap:14px;
+  align-items:center; background:#2e2512; color:#cfe2df;
+  border:1px solid #515e56; border-radius:16px; padding:14px !important ;
+  box-shadow:0 16px 34px rgba(0,0,0,.25);
+  margin: 6px 0 !important;  
+}
+.sf-ico {
+  width:42px; height:42px; border-radius:12px; display:grid; place-items:center;
+  background:#112020; border:1px solid #515e56; font-size:18px;
+}
+.sf-main { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.sf-title { font-size:1rem; font-weight:700; color:#e8f3f1; margin:0; }
+.sf-meta { font-size:.8rem; color:#98b1ad; }
+.sf-actions { display:flex; gap:8px; flex-wrap:wrap; }
+
+.btn-min {
+  background:#101a1a; color:#d7e5e3; border:1px solid #2b3c3c;
+  border-radius:10px; padding:.42rem .6rem; font-size:.78rem; cursor:pointer;
+}
+.btn-min:hover { background:#132020; }
+.btn-danger {
+  background:#321515; color:#ffd9d9; border:1px solid #733a3a;
+}
+.btn-danger:hover { background:#3a1717; }
+
+.pending-wrap {
+  background:#0b1010; border:1px solid #515e56; border-radius:14px; padding:12px;
+  display:grid; gap:10px; color:#cfe2df; box-shadow:0 12px 28px rgba(0,0,0,.22);
+}
+.pending-row { display:flex; gap:8px; align-items:center; justify-content:space-between; }
+/* ===== Responsive shared layout ===== */
+.shared-container{
+  max-width: min(1840px, 98vw);
+  margin: 0 auto;
+    margin-top: 14px !important;
+  padding: clamp(10px, 2vw, 24px);
+  display: grid !important;
+  align-items:start !important;
+  justify-content: center !important;
+  gap: clamp(12px, 2vw, 22px);
+}
+
+
+/* תיבות/כרטיסים ימלאו את הרוחב הזמין */
+.pending-wrap,
+.cozy-head
+
+{
+  width: 100%;
+}
+
+
+
+/* פעולות בתיקייה – לעטוף בשבירה יפה במובייל */
+.sf-actions{
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+/* כותרת עם כפתור בצד – רספונסיבי */
+.cozy-head{
+  display:flex; align-items:center; justify-content:space-between;
+  background:#2e2512; color:#d6e6df; border:1px solid #515e56;
+  border-radius:14px; padding:12px 14px; box-shadow:0 12px 28px rgba(0,0,0,.22);
+}
+
+/* בקשות ממתינות – תיבה מלאה רוחב */
+.pending-wrap{
+  background:#2e2512; border:1px solid #243030; border-radius:14px;
+  padding:14px; color:#cfe2df; box-shadow:0 12px 28px rgba(0,0,0,.22);
+}
+
+/* כפתורים */
+.btn-cozy{
+  background:#2e2512; color:#fff; border:1px solid #515e56;
+  border-radius:10px; padding:.55rem .8rem; font-weight:600; cursor:pointer;
+  box-shadow:0 10px 24px rgba(0,0,0,.28); transition:.18s;
+}
+.btn-cozy:hover{ filter:brightness(1.08); transform:translateY(-1px); }
+
+.btn-min{
+  background:#2e2512; color:#d7e5e3; border:1px solid #515e56;
+  border-radius:10px; padding:.42rem .6rem; font-size:.88rem; cursor:pointer;
+}
+.btn-min:hover{ background:#132020; }
+.btn-danger{ background:#321515; color:#ffd9d9; border:1px solid #733a3a; }
+.btn-danger:hover{ background:#3a1717; }
+
+/* טיפוגרפיה קטנה לשורות משנה */
+.sf-title{ font-size:1.05rem; font-weight:700; color:#e8f3f1; margin:0; }
+.sf-meta{ font-size:.9rem; color:#98b1ad; }
+
+/* התאמות רוחב למסכים גדולים */
+@media (min-width: 1200px){
+  .shared-container{ max-width: 1280px !important;}
+}
+
+/* התאמות מובייל */
+@media (max-width: 560px){
+  .cozy-head{ flex-direction: column; align-items: stretch; gap: 10px; }
+  .sf-actions{ justify-content: stretch; }
+}
+/* כשאנחנו במצב אחסון משותף, docsList לא יהיה grid של כרטיסים */
+.docs-list.shared-mode {
+  display: block;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)) !important;
+  gap: 16px !important;
+
+  width: 100%;
+}
+
+
+/* ריווח בין הבלוקים השחורים (עובד גם אם העטיפה שונה) */
+.cozy-head,
+.pending-wrap
+ {
+  margin-top: 14px !important;    /* רווח מלמעלה לכל בלוק */
+}
+
+
+
+
+
+.shared-container {
+    display: flex !important
+;
+    margin-right: 20px !important;
+    flex-wrap: wrap;
+    align-content: center;
+    align-items: flex-end;
+    flex-direction: row;
+}
+
+
+.sf-list {
+    display: flex !important;
+    gap: 16px !important;
+    width: 100%;
+    flex-wrap: nowrap;
+    grid-template-columns: repeat(auto-fit, minmax(550px, 1fr)) !important;
+    margin-right: 29px !important;
+    flex-direction: column;
+    align-content: stretch;
+    align-items: flex-end;
+}
+
+/* אם עדיין לא מספיק, אפשר להגדיל את המרחק */
+@media (min-width: 1000px) {
+  .shared-container {
+    margin-right: 20px !important;
+  }
+}
+
+
+
+element.style {
+    display: grid
+;
+    gap: 92px;
+    margin: 28px;
+}
+
+
+
+
+
+
+
+
+
+
+.shared-view {
+  display: block;
+  width: 100%;
+  margin-top: 20px;
+}
+
+.shared-block {
+  background: #2e2512;
+  border: 1px solid #515e56;
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 24px;
+  color: #cfe2df;
+  box-shadow: 0 12px 28px rgba(0,0,0,.22);
+}
+
+.shared-block h3 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.docs-list.shared-mode {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+  width: 100%;
+}
+
+
+
+
+
+
+
+
+
+
+/* ==== TETROMINO ANIMATION ==== */
+
+/* אריח בודד */
+.tetromino {
+  width: 96px;
+  height: 112px;
+  position: absolute;
+  transition: all ease .3s;
+  background: url('data:image/svg+xml;utf-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 612 684"%3E%3Cpath fill="%23010101" d="M305.7 0L0 170.9v342.3L305.7 684 612 513.2V170.9L305.7 0z"/%3E%3Cpath fill="%23fff" d="M305.7 80.1l-233.6 131 233.6 131 234.2-131-234.2-131"/%3E%3C/svg%3E') no-repeat top center;
+}
+
+/* מהירות: 1.5 שניות; מרחקים: xspace=48px, yspace=27px */
+.box1 { animation: tetromino1 1.5s ease-out infinite; }
+.box2 { animation: tetromino2 1.5s ease-out infinite; }
+.box3 { animation: tetromino3 1.5s ease-out infinite; z-index: 2; }
+.box4 { animation: tetromino4 1.5s ease-out infinite; }
+
+@keyframes tetromino1 {
+  0%, 40%   { transform: translate(0px, 0px); }
+  50%       { transform: translate(48px, -27px); }
+  60%, 100% { transform: translate(96px, 0px); }
+}
+
+@keyframes tetromino2 {
+  0%, 20%   { transform: translate(96px, 0px); }
+  40%, 100% { transform: translate(144px, 27px); }
+}
+
+@keyframes tetromino3 {
+  0%        { transform: translate(144px, 27px); }
+  20%, 60%  { transform: translate(96px, 54px); }
+  90%, 100% { transform: translate(48px, 27px); }
+}
+
+@keyframes tetromino4 {
+  0%, 60%   { transform: translate(48px, 27px); }
+  90%, 100% { transform: translate(0px, 0px); }
+}
+
+
+/* ==== LOADING — FINAL OVERRIDES ==== */
+#loading-overlay.hidden { opacity: 0 !important; pointer-events: none !important; }
+
+#loading-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  display: grid !important;
+  place-items: center !important;
+  z-index: 99999 !important;
+  background: rgba(0,0,0,.75) !important;
+}
+
+#loading-overlay .loading-stack {
+  display: flex   !important;
+  flex-direction: column !important;
+  align-items: center !important;
+   top: 50% !important;
+     transform: translate(-50%, -50%) !important;
+
+  left: 50% !important;
+  gap: 16px !important;      /* רווח בין האנימציה לטקסט */
+  text-align: center !important;
+}
+
+/* מסגרת מוגדרת לגודל האנימציה, כדי שלא תגלוש על הטקסט */
+#loading-overlay .tetro-frame {
+  width: 220px !important;      /* אפשר לשנות גודל כאן */
+  height: 180px !important;
+  position: relative !important;
+  margin: 0 auto !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* מבטלים לחלוטין את המיקום הישן של tetrominos */
+#loading-overlay .tetrominos {
+  position: relative !important; /* לא absolute כאן */
+  inset: auto !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  margin: 0 auto !important;
+  width: 192px !important;      /* גודל האנימציה */
+  height: 140px !important;
+}
+
+/* גודל ה"אריחים" נשאר, אבל אפשר לכוונן את הסקייל אם גדול מדי */
+#loading-overlay .tetrominos { transform: scale(0.9) !important; } /* 0.8/1.0 לפי הטעם */
+#loading-overlay .loading-stack { gap: -12px !important; } /* או 20px */
+
+
+#loading-overlay .loading-text {
+  display: block !important;
+  margin: 0 auto !important;
+  margin-right: -84px !important;
+  width: 100% !important;
+  max-width: 80vw !important;       /* אפשר לשנות אם יש שורה ארוכה */
+  text-align: right !important;     /* זה הטריק המרכזי */
+  direction: rtl !important;         /* עברית */
+  unicode-bidi: plaintext !important;
+  line-height: 1.35 !important;
+  font-weight: 600 !important;
+  color: #fff !important;
+}
+
+
+
+
+
+/* Settings Panel Styles */
+.section {
+  margin: 20px 0;
+}
+
+.section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text-dark);
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.block-label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 10px;
+  font-size: 0.85rem;
+}
+
+.theme-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 2px solid var(--border-soft);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--bg-card);
+}
+
+.pill input[type="radio"] {
+  margin: 0;
+}
+
+.pill:has(input:checked) {
+  background: var(--accent-soft);
+  border-color: var(--accent-strong);
+  color: #fff;
+}
+
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.switch input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.hint {
+  font-size: 0.75rem;
+  color: var(--text-mid);
+  margin-top: 8px;
+  opacity: 0.8;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 12px;
+}
+
+/* Dark Mode Variables */
+.theme-dark {
+  --bg-app: #1a1a1a;
+  --bg-card: #2a2a2a;
+  --bg-sidebar-from: #0f0f0f;
+  --bg-sidebar-to: #1a1a1a;
+  --border-soft: rgba(255, 255, 255, 0.1);
+  --text-dark: #e0e0e0;
+  --text-mid: #b0b0b0;
+  --accent-soft: #d67a7a;
+  --accent-strong: #e8d4b4;
+  --shadow-card: 0 12px 32px rgba(0,0,0,0.5);
+  --shadow-topbar: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.theme-dark body {
+  background: var(--bg-app);
+  color: var(--text-dark);
+}
+
+.theme-dark .top-bar {
+  background: #3a4a3a;
+}
+
+.theme-dark .tabs-bar {
+  background: #1a1a0a;
+  border-bottom-color: #3a3a3a;
+}
+
+.theme-dark .page-title,
+.theme-dark .page-sub {
+  color: var(--text-dark);
+}
+
+.theme-dark .upload-btn {
+  background: #4a3a3a;
+  color: #e0e0e0;
+}
+
+.theme-dark .folder-card,
+.theme-dark .doc-card {
+  background: var(--bg-card);
+  border-color: var(--border-soft);
+}
+
+.theme-dark .modal {
+  background: #2a2a2a;
+  color: #e0e0e0;
+}
+
+.theme-dark .modal-head,
+.theme-dark .modal-foot {
+  background: #2a2a2a;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.theme-dark .btn {
+  background: #3a3a3a;
+  color: #e0e0e0;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.theme-dark .card {
+  background: #333;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.theme-dark .pill {
+  background: #3a3a3a;
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #e0e0e0;
+}
+
+.theme-dark .pill:has(input:checked) {
+  background: #d67a7a;
+  border-color: #e8d4b4;
+}
+
+
+
+  </style>
+<script type="importmap">
+{
+  "imports": {
+    "firebase/app": "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js",
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"
+  }
+}
+</script>
+  <script type="module" crossorigin src="/assets/index-BXzV1XXI.js"></script>
+</head>
+
+<body>
+<!-- PDF.js מהפרויקט המקומי שלנו -->
+<script src="/libs/pdf.min.js"></script>
+<script src="/libs/pdf.worker.min.js"></script>
+<script>
+  if (window['pdfjsLib']) {
+    window['pdfjsLib'].GlobalWorkerOptions.workersrc="/libs/pdf.worker.min.js";
+    console.log("✅ pdfjsLib loaded (local)", window['pdfjsLib'].version || "no version field but loaded");
+  } else {
+    console.warn("⚠️ pdfjsLib failed to load (local)");
+  }
+</script>
+
+<!-- Tesseract.js ל-OCR -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script>
+  if (window.Tesseract) {
+    console.log("✅ Tesseract loaded");
+  } else {
+    console.warn("⚠️ Tesseract failed to load");
+  }
+</script>
+
+
+
+
+  <div class="dashboard">
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="sidebar" id="sidebarDrawer">
+      <div>
+        <div class="brand-block">
+  <div class="brand-row">
+    <div class="brand-name">EcoDocs</div>
+    <button id="closeMenuBtn" class="close-btn" aria-label="סגור">✕</button>
+  </div>
+
+  <div class="brand-sub">ארכיון חכם • שמור • אישי</div>
+</div>
+        
+
+        <div class="user-panel">
+          <div class="user-panel-name" id="currentUserLabel">שלום, משתמש!</div>
+          <div class="user-panel-mail" id="currentUserEmail">user@example.com</div>
+        </div>
+
+        <nav class="menu">
+          <div class="menu-label">ניווט</div>
+
+          <button class="menu-item active" data-view="home">
+            <div class="menu-item-icon">🏠</div>
+            <span>דף הבית</span>
+          </button>
+
+          <button class="menu-item" data-view="shared">
+            <div class="menu-item-icon">🤝</div>
+            <span>אחסון משותף</span>
+          </button>
+
+          <button class="menu-item" data-view="recycle">
+            <div class="menu-item-icon">🗑️</div>
+            <span>סל מחזור</span>
+            
+          </button>
+          <button class="menu-item" data-view="settings">
+            <div class="menu-item-icon">⚙️</div>
+            <span>הגדרות</span>
+            
+          </button>
+
+          
+          
+        </nav>
+      </div>
+
+      <div class="sidebar-bottom">
+        <button class="logout-btn" id="logoutBtn">התנתקות</button>
+      </div>
+    </aside>
+
+    <!-- ===== MAIN AREA ===== -->
+    <section class="main-area">
+      <!-- בר עליון -->
+      <header class="top-bar">
+        <div class="top-left">
+          <h1 style="color: #000000; font-size:large;" class="page-title">הארכיון שלי</h1>
+          <h1 style="color: #000000; font-size:small;" class="page-title">כל המסמכים שלך במקום אחד</h1>
+        </div>
+
+        <div class="top-right">
+
+          
+  <!-- כפתור פרימיום חדש -->
+  <button class="premium-btn" id="premiumBtn"> פרימיום</button>
+  <!-- תפריט מובייל -->
+  <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
+
+  <!-- Logout במובייל -->
+  <button class="logout-btn mobile-logout" id="mobileLogoutBtn">🚪 התנתקות</button>
+
+  <!-- כפתור העלאת קובץ -->
+  <button class="upload-btn" id="uploadBtn">📤 העלה מסמך</button>
+  <input
+    type="file"
+    id="fileInput"
+    class="hidden-input"
+    accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.bmp,.doc,.docx"
+  />
+
+</div>
+
+      </header>
+
+      <!-- טאבים (משתמשת בהמשך בעיקר למיון/תצוגה) -->
+      <div class="tabs-bar">
+        <button class="tab-btn active" data-sort="category">לפי קטגוריה</button>
+        <button class="tab-btn" data-sort="year">לפי שנה</button>
+        <button class="tab-btn" data-sort="org">לפי ארגון</button>
+        <button class="tab-btn" data-sort="recipient">לפי נמען</button>
+      </div>
+
+      <!-- אזור התוכן -->
+      <div class="content-scroll-area">
+        <!-- מסך בית: כרטיסי תיקיות -->
+        <section class="home-view" id="homeView">
+          <h2 class="view-title">התיקיות שלך</h2>
+          <div class="folder-grid" id="folderGrid"></div>
+        </section>
+
+        <!-- מסך קטגוריה -->
+        <section class="category-view hidden" id="categoryView">
+          <div class="category-view-header">
+            <button class="back-button" id="backButton">⬅ חזרה</button>
+            <h2 class="category-title" id="categoryTitle">שם תיקייה</h2>
+
+            <!-- שומר את אותו select כמו שהיה לך, + שתי אפשרויות מיון לפי אחריות -->
+            <select id="sortSelect" style="margin-right:auto; font-size:.75rem; padding:.4rem .5rem; border-radius:6px;">
+              <option value="uploadedAt-desc">תאריך העלאה (חדש בהתחלה)</option>
+              <option value="uploadedAt-asc">תאריך העלאה (ישן בהתחלה)</option>
+              <option value="org-asc">לפי ארגון א→ת</option>
+              <option value="org-desc">לפי ארגון ת→א</option>
+              <option value="year-desc">שנה (חדש קודם)</option>
+              <option value="year-asc">שנה (ישן קודם)</option>
+              <option value="title-asc">שם קובץ א→ת</option>
+              <option value="title-desc">שם קובץ ת→א</option>
+              <option value="warrantyStart-desc">תאריך קנייה (חדש קודם)</option>
+              <option value="warrantyStart-asc">תאריך קנייה (ישן קודם)</option>
+              <option value="warrantyExpiresAt-asc">פג תוקף אחריות (מוקדם קודם)</option>
+              <option value="warrantyExpiresAt-desc">פג תוקף אחריות (מאוחר קודם)</option>
+            </select>
+          </div>
+
+          <div class="docs-list" id="docsList"></div>
+        </section>
+
+
+        <!-- === אחסון משותף === -->
+<section class="shared-view hidden" id="sharedView">
+  <div class="shared-container">
+
+    <!-- בלוק ראשון: בקשות ממתינות -->
+    <section class="shared-block pending-wrap">
+      <div class="cozy-head">
+        <h3>בקשות ממתינות</h3>
+      </div>
+      <div id="pendingList" class="sf-list">
+        <!-- כאן ייכנסו בקשות ממתינות -->
+      </div>
+    </section>
+
+    <!-- בלוק שני: תיקיות משותפות -->
+    <section class="shared-block folders-wrap">
+      <div class="cozy-head">
+        <h3>תיקיות משותפות</h3>
+        <button class="btn-cozy" id="createSharedFolderBtn">➕ צור תיקייה משותפת</button>
+      </div>
+      <div id="sharedFoldersGrid" class="docs-list shared-mode">
+        <!-- כאן ייכנסו התיקיות -->
+      </div>
+    </section>
+
+    <!-- בלוק שלישי: מסמכים משותפים -->
+    <section class="shared-block documents-wrap">
+      <div class="cozy-head">
+        <h3>מסמכים משותפים</h3>
+      </div>
+      <div id="sharedDocsList" class="docs-list shared-mode">
+        <!-- כאן ייכנסו המסמכים -->
+      </div>
+    </section>
+
+  </div>
+</section>
+
+
+      </div>
+    </section>
+  </div><!-- /dashboard -->
+
+  <!-- התראות צפות -->
+  <div id="notification" class="notification hidden"></div>
+
+  <!-- עורך מסמך -->
+<!-- עורך מסמך -->
+<div id="editModal" class="hidden" style="
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  font-family: 'Rubik', system-ui, sans-serif;
+">
+  <div style="
+    background: #fff;
+    color: #000;
+    min-width: 320px;
+    max-width: 90vw;
+    width: 400px;
+    border-radius: 12px;
+    box-shadow: 0 20px 40px rgba(0,0,0,.4);
+    padding: 1rem 1rem 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+  ">
+
+    <h2 style="margin:0; font-size:.9rem; font-weight:600; color:#000;">
+      עריכת פרטי המסמך
+    </h2>
+
+    <form id="editForm" style="display:flex; flex-direction:column; gap:.5rem; font-size:.8rem;">
+
+      <label>
+        שם קובץ:
+        <input id="edit_title" type="text" style="width:100%; padding:.4rem; border-radius:6px; border:1px solid #bbb;">
+      </label>
+
+      <label>
+        ארגון:
+        <input id="edit_org" type="text" style="width:100%; padding:.4rem; border-radius:6px; border:1px solid #bbb;">
+      </label>
+
+      <label>
+        שנה:
+        <input id="edit_year" type="number" style="width:100%; padding:.4rem; border-radius:6px; border:1px solid #bbb;">
+      </label>
+
+      <label>
+        שייך ל (מופרד בפסיקים):
+        <input id="edit_recipient" type="text" style="width:100%; padding:.4rem; border-radius:6px; border:1px solid #bbb;">
+      </label>
+
+      <label>
+        תאריך קנייה / התחלה (yyyy-mm-dd):
+        <input id="edit_warrantyStart" type="date" style="width:100%; padding:.4rem; border-radius:6px; border:1px solid #bbb;">
+      </label>
+
+      <label>
+        תוקף אחריות עד (yyyy-mm-dd):
+        <input id="edit_warrantyExpiresAt" type="date" style="width:100%; padding:.4rem; border-radius:6px; border:1px solid #bbb;">
+      </label>
+
+      <label>
+        מחיקה אוטומטית אחרי (yyyy-mm-dd):
+        <input id="edit_autoDeleteAfter" type="date" style="width:100%; padding:.4rem; border-radius:6px; border:1px solid #bbb;">
+      </label>
+
+      <label>
+        קטגוריה:
+        <input id="edit_category" type="text" style="width:100%; padding:.4rem; border-radius:6px; border:1px solid #bbb;">
+      </label>
+
+      <label>
+        שותף עם (אימיילים בפסיקים):
+        <input id="edit_sharedWith" type="text" style="width:100%; padding:.4rem; border-radius:6px; border:1px solid #bbb;">
+      </label>
+
+      <div style="display:flex; gap:.5rem; margin-top:.75rem; justify-content:flex-end;">
+        <button type="button" id="editCancelBtn"
+          style="background:#b63a3a; color:#fff; border:0; border-radius:6px; font-weight:600; padding:.5rem .75rem; cursor:pointer;">
+          ביטול
+        </button>
+
+        <button type="submit" id="editSaveBtn"
+          style="background:#0e3535; color:#fff; border:0; border-radius:6px; font-weight:600; padding:.5rem .75rem; cursor:pointer;">
+          שמירה
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+
+<div id="loading-overlay" class="loading-overlay hidden ">
+  <div class="loading-stack">
+    <div class="tetro-frame">
+      <div class="tetrominos">
+        <div class="tetromino box1"></div>
+        <div class="tetromino box2"></div>
+        <div class="tetromino box3"></div>
+        <div class="tetromino box4"></div>
+      </div>
+    </div>
+    <p class="loading-text">מזהה טקסט... אנא המתיני</p>
+  </div>
+</div>
+
+
+
+<!-- Premium Panel (Modal) -->
+<div id="premiumPanel" class="modal-backdrop hidden" dir="rtl" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="premiumTitle" tabindex="-1">
+    <div class="modal-head">
+      <h2 id="premiumTitle">בחרו תוכנית</h2>
+      <button class="modal-close" id="premiumCloseBtn" aria-label="סגור">✖</button>
+    </div>
+
+
+     <div class="scroll-area">
+    <p class="muted">שדרגו את Eco-Files כדי לקבל עוד שטח אחסון, שיתופים ללא הגבלה ותכונות חכמות.</p>
+
+    <div class="plans-grid">
+      <!-- Free -->
+      <article class="plan" data-plan="free" aria-label="תוכנית חינם">
+        <header>
+          <h3>חינם</h3>
+          <div class="price">₪0<span class="per">/חודש</span></div>
+        </header>
+        <ul class="features">
+          <li>אחסון עד 1GB</li>
+          <li>תיקייה משותפת אחת</li>
+          <li>העלאות בסיסיות</li>
+        </ul>
+        <button class="btn btn-ghost" disabled>נוכחי</button>
+      </article>
+
+      <!-- Pro -->
+      <article class="plan" data-plan="pro" aria-label="תוכנית פרו">
+        <header>
+          <h3>פרו</h3>
+          <div class="price">₪11<span class="per">/חודש</span></div>
+        </header>
+        <ul class="features">
+          <li>אחסון עד 10GB</li>
+          <li>שיתוף עד 5 משתמשים</li>
+          <li>תיוגים וחיפוש חכם</li>
+          <li>OCR מהיר</li>
+        </ul>
+        <button class="btn" data-select-plan="pro">בחר פרו</button>
+      </article>
+
+      <!-- Premium -->
+      <article class="plan plan-accent" data-plan="premium" aria-label="תוכנית פרימיום">
+        <header>
+          <h3>פרימיום 💎</h3>
+          <div class="price">₪29<span class="per">/חודש</span></div>
+        </header>
+        <ul class="features">
+          <li>אחסון בלתי מוגבל</li>
+          <li>שיתוף ללא הגבלה</li>
+          <li>AI סיווג וסריקה אוטומטית</li>
+          <li>סנכרון בזמן אמת ותמיכה בעדיפות</li>
+        </ul>
+        <button class="btn btn-accent" data-select-plan="premium">בחר פרימיום</button>
+      </article>
+    </div>
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn" id="premiumLaterBtn">אולי אחר-כך</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Settings Panel -->
+<div id="settingsPanel" class="modal-backdrop hidden" dir="rtl" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" tabindex="-1">
+    <header class="modal-head">
+      <h2 id="settingsTitle">הגדרות</h2>
+      <button class="icon-btn" data-close aria-label="סגור">
+        ✖
+      </button>
+    </header>
+
+    <div class="scroll-area">
+      <!-- Appearance -->
+      <section class="section">
+        <h3 class="section-title">מראה</h3>
+
+        <!-- Theme chooser -->
+        <!-- Theme chooser -->
+<div class="card">
+  <label class="block-label">ערכת צבע</label>
+  <div class="theme-row" role="radiogroup" aria-label="Theme">
+    <label class="pill">
+      <input type="radio" name="theme" value="light" id="themeLight">
+      <span>מצב בהיר</span>
+    </label>
+    <label class="pill">
+      <input type="radio" name="theme" value="dark" id="themeDark">
+      <span>מצב כהה</span>
+    </label>
+  </div>
+</div>
+
+        
+      </section>
+
+      <!-- Behavior -->
+      <section class="section">
+        <h3 class="section-title">התנהגות</h3>
+        <div class="grid-2">
+          <div class="card">
+            <label class="block-label">מחיקה</label>
+            <label class="switch">
+              <input type="checkbox" id="toggleConfirmDelete">
+              <span class="switch-ui"></span>
+              <span class="switch-text">אישור לפני מחיקה</span>
+            </label>
+            <p class="hint">יבקש אישור לפני מחיקת קובץ או תיקייה.</p>
+          </div>
+
+         
+        </div>
+      </section>
+    </div>
+
+    <footer class="modal-foot">
+      <button class="btn" data-close>סגור</button>
+    </footer>
+  </div>
+</div>
+
+
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  // Elements
+  const settingsBtn = document.querySelector('.menu-item[data-view="settings"]');
+  const panel = document.getElementById("settingsPanel");
+  const modal = panel?.querySelector(".modal");
+
+  // Theme inputs
+  const themeLight = document.getElementById("themeLight");
+  const themeDark = document.getElementById("themeDark");
+  
+  // Other inputs
+  const elCompact = document.getElementById("toggleCompact");
+  const elReduce = document.getElementById("toggleReduceMotion");
+  const elConfirm = document.getElementById("toggleConfirmDelete");
+  const elStart = document.getElementById("selectStart");
+
+  // Load + apply on boot
+  const DEFAULTS = {
+    theme: "light",
+    compact: false,
+    reduceMotion: false,
+    confirmDelete: true,
+    startPage: "my"
+  };
+
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem("eco_settings");
+      return raw ? { ...DEFAULTS, ...JSON.parse(raw) } : { ...DEFAULTS };
+    } catch { 
+      return { ...DEFAULTS }; 
+    }
+  }
+
+  function saveSettings(s) {
+    localStorage.setItem("eco_settings", JSON.stringify(s));
+  }
+
+  function applySettings(s) {
+    // Theme - apply to documentElement
+    document.documentElement.classList.remove("theme-light", "theme-dark");
+    document.documentElement.classList.add(`theme-${s.theme}`);
+    
+    // Update radio buttons
+    if (themeLight) themeLight.checked = (s.theme === "light");
+    if (themeDark) themeDark.checked = (s.theme === "dark");
+
+    // Compact density
+    document.body.classList.toggle("compact-density", !!s.compact);
+    if (elCompact) elCompact.checked = !!s.compact;
+
+    // Reduce motion
+    document.documentElement.classList.toggle("reduce-motion", !!s.reduceMotion);
+    if (elReduce) elReduce.checked = !!s.reduceMotion;
+
+    // Confirm before delete
+    if (elConfirm) elConfirm.checked = !!s.confirmDelete;
+
+    // Default start page
+    if (elStart) elStart.value = s.startPage;
+  }
+
+  let settings = loadSettings();
+  applySettings(settings);
+
+  // Open/Close
+  function openSettings() {
+    panel?.classList.remove("hidden");
+    panel?.setAttribute("aria-hidden", "false");
+    document.documentElement.style.overflow = "hidden";
+    modal?.focus();
+  }
+  
+  function closeSettings() {
+    panel?.classList.add("hidden");
+    panel?.setAttribute("aria-hidden", "true");
+    document.documentElement.style.overflow = "";
+    settingsBtn?.focus();
+  }
+
+  settingsBtn?.addEventListener("click", (e) => {
+    e.preventDefault();
+    openSettings();
+  });
+
+  // Close handlers
+  panel?.addEventListener("click", (e) => {
+    const t = e.target;
+    if (t === panel || t.closest("[data-close]")) closeSettings();
+  });
+  
+  panel?.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeSettings();
+  });
+
+  // Theme toggle handlers
+  themeLight?.addEventListener("change", (e) => {
+    if (e.target.checked) {
+      settings.theme = "light";
+      saveSettings(settings);
+      applySettings(settings);
+    }
+  });
+  
+  themeDark?.addEventListener("change", (e) => {
+    if (e.target.checked) {
+      settings.theme = "dark";
+      saveSettings(settings);
+      applySettings(settings);
+    }
+  });
+
+  // Other handlers
+  elCompact?.addEventListener("change", (e) => {
+    settings.compact = !!e.target.checked;
+    saveSettings(settings);
+    applySettings(settings);
+  });
+  
+  elReduce?.addEventListener("change", (e) => {
+    settings.reduceMotion = !!e.target.checked;
+    saveSettings(settings);
+    applySettings(settings);
+  });
+  
+  elConfirm?.addEventListener("change", (e) => {
+    settings.confirmDelete = !!e.target.checked;
+    saveSettings(settings);
+    applySettings(settings);
+  });
+  
+  elStart?.addEventListener("change", (e) => {
+    settings.startPage = e.target.value;
+    saveSettings(settings);
+  });
+
+  // Export function for delete confirmation
+  window.shouldConfirmBeforeDelete = () => loadSettings().confirmDelete === true;
+});
+</script>
+
+
+  <!-- סקריפט עזר UI (כניסה/יציאה/ניווט בתפריט) -->
+  <script>
+    // שם משתמש בפינה
+    const label = document.getElementById("currentUserLabel");
+    const mail = document.getElementById("currentUserEmail");
+    const currentUserShown = sessionStorage.getItem("docArchiveCurrentUser");
+    if (label) label.textContent = `שלום, ${currentUserShown}`;
+    if (mail) mail.textContent = currentUserShown;
+
+    // התנתקות
+    const logoutBtn = document.getElementById("logoutBtn");
+    if (logoutBtn) {
+      logoutBtn.addEventListener("click", () => {
+        sessionStorage.removeItem("docArchiveCurrentUser");
+        sessionStorage.removeItem("loginSuccess");
+        window.location.href = "./forms/eco-wellness/index.html";
+      });
+    }
+    const mobileLogoutBtn = document.getElementById("mobileLogoutBtn");
+    if (mobileLogoutBtn) {
+      mobileLogoutBtn.addEventListener("click", () => {
+        sessionStorage.removeItem("docArchiveCurrentUser");
+        sessionStorage.removeItem("loginSuccess");
+        window.location.href = "./forms/eco-wellness/index.html";
+      });
+    }
+
+    // טאבים בראש (רק עיצוב כרגע)
+    const tabs = document.querySelectorAll(".tab-btn");
+    tabs.forEach(tab => {
+      tab.addEventListener("click", () => {
+        tabs.forEach(t => t.classList.remove("active"));
+        tab.classList.add("active");
+      });
+    });
+
+    // תפריט צד נפתח במובייל
+    const sidebarDrawer = document.getElementById("sidebarDrawer");
+    const mobileMenuBtn = document.getElementById("mobileMenuBtn");
+    if (mobileMenuBtn) {
+      mobileMenuBtn.addEventListener("click", () => {
+        sidebarDrawer.classList.toggle("open");
+      });
+    }
+
+    // מעבר בין דפים (בית / שיתוף / סל מחזור)
+    const menuItems = document.querySelectorAll(".menu-item");
+    menuItems.forEach(btn => {
+      btn.addEventListener("click", () => {
+        menuItems.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+
+        const view = btn.dataset.view;
+        if (view === "home") {
+          window.App?.renderHome();
+        } else if (view === "shared") {
+          window.App?.openSharedView();
+        } else if (view === "recycle") {
+          window.App?.openRecycleView();
+        }
+
+        // אחרי בחירה במובייל – לסגור את הצד
+        if (window.matchMedia("(max-width: 760px)").matches) {
+          sidebarDrawer.classList.remove("open");
+        }
+      });
+    });
+  </script>
+
+<script>
+        // Add this at the bottom
+        // Require user to be logged in to view this page
+        requireLogin();
+        
+        // Now you can get the logged in user
+        
+    </script>
+
+<!-- Import map for bare imports used by firebase-config.js -->
+
+
+<!-- Initialize Firebase (v10 ESM) and expose window.db / window.fs -->
+<script type="module" src="/firebase-config.js"></script>
+
+<!-- Your app AFTER Firebase globals exist -->
+<script src="/JS/main.js"></script>
+
+
+
+  <div id="react-root" style="display:none"></div>
+</body>
+</html>

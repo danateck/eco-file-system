@@ -1,0 +1,5 @@
+.header {
+    background-color: var(--clr-primary-green);
+    height: max-content;
+    min-height: 5rem;
+}

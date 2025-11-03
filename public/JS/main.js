@@ -1,6 +1,283 @@
 // main.js - גרסה עם IndexedDB לשמירת קבצים גדולים בצורה יציבה
 
 
+
+
+
+
+
+// Add this helper function at the top of your main.js
+function getCurrentUserEmail() {
+  return sessionStorage.getItem("docArchiveCurrentUser") || "";
+}
+
+// ============================================
+// FIX 1: Load documents with user filtering
+// ============================================
+// v9 modular version
+async function loadDocuments() {
+  const raw = getCurrentUserEmail();
+  const currentUser = raw ? normalizeEmail(raw) : null;
+  if (!currentUser) {
+    console.error("No user logged in");
+    return [];
+  }
+  if (!isFirebaseAvailable()) {
+    console.warn("Firebase unavailable; returning local-only docs");
+    return getUserDocs(getCurrentUser()); // or your local fallback
+  }
+
+  try {
+    const docsCol = window.fs.collection(window.db, "documents");
+    const ownedQ  = window.fs.query(docsCol, window.fs.where("owner", "==", currentUser));
+    const sharedQ = window.fs.query(docsCol, window.fs.where("sharedWith", "array-contains", currentUser));
+
+    const [ownedSnap, sharedSnap] = await Promise.all([
+      window.fs.getDocs(ownedQ),
+      window.fs.getDocs(sharedQ)
+    ]);
+
+    const docs = [];
+    ownedSnap.forEach(d => docs.push({ id: d.id, ...d.data() }));
+    sharedSnap.forEach(d => {
+      if (!docs.find(x => x.id === d.id)) docs.push({ id: d.id, ...d.data() });
+    });
+
+    return docs;
+  } catch (error) {
+    console.error("Error loading documents:", error);
+    return [];
+  }
+}
+
+
+// ============================================
+// FIX 2: Upload document with owner info
+// ============================================
+async function uploadDocument(file, metadata = {}) {
+  const raw = getCurrentUserEmail();
+  const currentUser = raw ? normalizeEmail(raw) : null;
+  if (!currentUser) throw new Error("User not logged in");
+
+  // Generate our doc ID so UI and Firestore use the same one
+  const newId = crypto.randomUUID();
+
+  let downloadURL = null;
+  try {
+    if (window.storage) {
+      const storageRef = window.fs.ref(window.storage, `documents/${currentUser}/${newId}_${file.name}`);
+      const snap = await window.fs.uploadBytes(storageRef, file);
+      downloadURL = await window.fs.getDownloadURL(snap.ref);
+    }
+  } catch (e) {
+    console.warn("Storage upload skipped/failed:", e);
+  }
+
+  const docRef = window.fs.doc(window.db, "documents", newId);
+  const docData = {
+    ...metadata,
+    owner: currentUser,
+    downloadURL: downloadURL || null,
+    fileName: file.name,
+    fileSize: file.size,
+    fileType: file.type,
+    uploadedAt: Date.now(),
+    sharedWith: Array.isArray(metadata.sharedWith) ? metadata.sharedWith : [],
+    deletedAt: null,
+    deletedBy: null
+  };
+
+  await window.fs.setDoc(docRef, docData, { merge: true });
+  return { id: newId, ...docData };
+}
+
+
+// ============================================
+// FIX 3: Load shared folders with user filtering
+// ============================================
+async function loadSharedFolders() {
+  const currentUser = getCurrentUserEmail();
+  if (!currentUser) {
+    console.error("No user logged in");
+    return [];
+  }
+
+  try {
+    const foldersCol = window.db.collection("sharedFolders");
+    
+    // Query folders where:
+    // - owner matches current user, OR
+    // - members array contains current user
+    const ownedSnapshot = await foldersCol
+      .where("owner", "==", currentUser)
+      .get();
+    
+    const memberSnapshot = await foldersCol
+      .where("members", "array-contains", currentUser)
+      .get();
+
+    const folders = [];
+    
+    // Add owned folders
+    ownedSnapshot.forEach(doc => {
+      folders.push({ id: doc.id, ...doc.data() });
+    });
+    
+    // Add folders where user is a member (avoid duplicates)
+    memberSnapshot.forEach(doc => {
+      if (!folders.find(f => f.id === doc.id)) {
+        folders.push({ id: doc.id, ...doc.data() });
+      }
+    });
+
+    return folders;
+  } catch (error) {
+    console.error("Error loading shared folders:", error);
+    return [];
+  }
+}
+
+// ============================================
+// FIX 4: Create shared folder with owner info
+// ============================================
+async function createSharedFolder(folderName, invitedEmails = []) {
+  const currentUser = getCurrentUserEmail();
+  if (!currentUser) {
+    throw new Error("User not logged in");
+  }
+
+  try {
+    const folderData = {
+      name: folderName,
+      owner: currentUser,  // CRITICAL: Tag with owner
+      members: [currentUser, ...invitedEmails],  // Include owner in members
+      pendingInvites: invitedEmails.map(email => ({
+        email: email,
+        invitedBy: currentUser,
+        invitedAt: new Date().toISOString(),
+        status: "pending"
+      })),
+      createdAt: new Date().toISOString(),
+      createdBy: currentUser
+    };
+
+    const folderRef = await window.db.collection("sharedFolders").add(folderData);
+    
+    return { id: folderRef.id, ...folderData };
+  } catch (error) {
+    console.error("Error creating shared folder:", error);
+    throw error;
+  }
+}
+
+// ============================================
+// FIX 5: Share document with proper ownership check
+// ============================================
+async function shareDocument(docId, recipientEmails) {
+  const currentUser = getCurrentUserEmail();
+  if (!currentUser) {
+    throw new Error("User not logged in");
+  }
+
+  try {
+    const docRef = window.db.collection("documents").doc(docId);
+    const docSnap = await docRef.get();
+    
+    if (!docSnap.exists) {
+      throw new Error("Document not found");
+    }
+
+    const docData = docSnap.data();
+    
+    // Check if current user is the owner
+    if (docData.owner !== currentUser) {
+      throw new Error("Only the owner can share this document");
+    }
+
+    // Add recipients to sharedWith array
+    const currentSharedWith = docData.sharedWith || [];
+    const newSharedWith = [...new Set([...currentSharedWith, ...recipientEmails])];
+
+    await docRef.update({
+      sharedWith: newSharedWith,
+      lastModified: new Date().toISOString(),
+      lastModifiedBy: currentUser
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error sharing document:", error);
+    throw error;
+  }
+}
+
+// ============================================
+// FIX 6: Get documents for specific category with user filter
+// ============================================
+async function getDocumentsByCategory(category) {
+  const currentUser = getCurrentUserEmail();
+  if (!currentUser) {
+    return [];
+  }
+
+  try {
+    const docsCol = window.db.collection("documents");
+    
+    // Get owned documents in this category
+    const ownedSnapshot = await docsCol
+      .where("owner", "==", currentUser)
+      .where("category", "==", category)
+      .where("deletedAt", "==", null)
+      .get();
+    
+    // Get shared documents in this category
+    const sharedSnapshot = await docsCol
+      .where("sharedWith", "array-contains", currentUser)
+      .where("category", "==", category)
+      .where("deletedAt", "==", null)
+      .get();
+
+    const docs = [];
+    
+    ownedSnapshot.forEach(doc => {
+      docs.push({ id: doc.id, ...doc.data() });
+    });
+    
+    sharedSnapshot.forEach(doc => {
+      if (!docs.find(d => d.id === doc.id)) {
+        docs.push({ id: doc.id, ...doc.data() });
+      }
+    });
+
+    return docs;
+  } catch (error) {
+    console.error("Error getting documents by category:", error);
+    return [];
+  }
+}
+
+// ============================================
+// EXPORT ALL FUNCTIONS
+// ============================================
+// Make these available globally or export them
+window.AppFunctions = {
+  loadDocuments,
+  uploadDocument,
+  loadSharedFolders,
+  createSharedFolder,
+  shareDocument,
+  getDocumentsByCategory,
+  getCurrentUserEmail
+};
+
+console.log("✅ User-scoped Firebase functions loaded");
+
+
+
+
+
+
+
 document.getElementById("closeMenuBtn")?.addEventListener("click", () => {
   // change '.sidebar' to your actual drawer element selector if different
   document.querySelector(".sidebar")?.classList.remove("open");
@@ -49,6 +326,26 @@ window.isFirebaseAvailable = function() {
 };
 
 
+
+
+async function bootFromCloud() {
+  try {
+    const raw = getCurrentUserEmail();
+    if (!raw) return; // user not logged in yet
+
+    // 1) Pull all the docs for this user from Firestore (owned + shared)
+    const cloudDocs = await loadDocuments(); // uses Firestore queries (v9 modular)
+    // 2) Cache locally (optional), so the rest of the UI can keep using allDocsData
+    allDocsData = cloudDocs || [];
+    setUserDocs(userNow, allDocsData, allUsersData); // local cache only
+
+    // 3) Finally draw UI
+    renderHome();
+  } catch (e) {
+    console.error("Boot from cloud failed:", e);
+    renderHome(); // fallback so UI isn’t blank
+  }
+}
 
 
 
@@ -2472,274 +2769,5 @@ if (currentCat === "אחסון משותף") {
   });
 
   // להתחיל בדף הבית
-  renderHome();
+  bootFromCloud();
 });
-
-
-// Add this helper function at the top of your main.js
-function getCurrentUserEmail() {
-  return sessionStorage.getItem("docArchiveCurrentUser") || "";
-}
-
-// ============================================
-// FIX 1: Load documents with user filtering
-// ============================================
-// v9 modular version
-async function loadDocuments() {
-  const raw = getCurrentUserEmail();
-  const currentUser = raw ? normalizeEmail(raw) : null;
-  if (!currentUser) {
-    console.error("No user logged in");
-    return [];
-  }
-  if (!isFirebaseAvailable()) {
-    console.warn("Firebase unavailable; returning local-only docs");
-    return getUserDocs(getCurrentUser()); // or your local fallback
-  }
-
-  try {
-    const docsCol = window.fs.collection(window.db, "documents");
-    const ownedQ  = window.fs.query(docsCol, window.fs.where("owner", "==", currentUser));
-    const sharedQ = window.fs.query(docsCol, window.fs.where("sharedWith", "array-contains", currentUser));
-
-    const [ownedSnap, sharedSnap] = await Promise.all([
-      window.fs.getDocs(ownedQ),
-      window.fs.getDocs(sharedQ)
-    ]);
-
-    const docs = [];
-    ownedSnap.forEach(d => docs.push({ id: d.id, ...d.data() }));
-    sharedSnap.forEach(d => {
-      if (!docs.find(x => x.id === d.id)) docs.push({ id: d.id, ...d.data() });
-    });
-
-    return docs;
-  } catch (error) {
-    console.error("Error loading documents:", error);
-    return [];
-  }
-}
-
-
-// ============================================
-// FIX 2: Upload document with owner info
-// ============================================
-async function uploadDocument(file, metadata = {}) {
-  const raw = getCurrentUserEmail();
-  const currentUser = raw ? normalizeEmail(raw) : null;
-  if (!currentUser) throw new Error("User not logged in");
-
-  // Generate our doc ID so UI and Firestore use the same one
-  const newId = crypto.randomUUID();
-
-  let downloadURL = null;
-  try {
-    if (window.storage) {
-      const storageRef = window.fs.ref(window.storage, `documents/${currentUser}/${newId}_${file.name}`);
-      const snap = await window.fs.uploadBytes(storageRef, file);
-      downloadURL = await window.fs.getDownloadURL(snap.ref);
-    }
-  } catch (e) {
-    console.warn("Storage upload skipped/failed:", e);
-  }
-
-  const docRef = window.fs.doc(window.db, "documents", newId);
-  const docData = {
-    ...metadata,
-    owner: currentUser,
-    downloadURL: downloadURL || null,
-    fileName: file.name,
-    fileSize: file.size,
-    fileType: file.type,
-    uploadedAt: Date.now(),
-    sharedWith: Array.isArray(metadata.sharedWith) ? metadata.sharedWith : [],
-    deletedAt: null,
-    deletedBy: null
-  };
-
-  await window.fs.setDoc(docRef, docData, { merge: true });
-  return { id: newId, ...docData };
-}
-
-
-// ============================================
-// FIX 3: Load shared folders with user filtering
-// ============================================
-async function loadSharedFolders() {
-  const currentUser = getCurrentUserEmail();
-  if (!currentUser) {
-    console.error("No user logged in");
-    return [];
-  }
-
-  try {
-    const foldersCol = window.db.collection("sharedFolders");
-    
-    // Query folders where:
-    // - owner matches current user, OR
-    // - members array contains current user
-    const ownedSnapshot = await foldersCol
-      .where("owner", "==", currentUser)
-      .get();
-    
-    const memberSnapshot = await foldersCol
-      .where("members", "array-contains", currentUser)
-      .get();
-
-    const folders = [];
-    
-    // Add owned folders
-    ownedSnapshot.forEach(doc => {
-      folders.push({ id: doc.id, ...doc.data() });
-    });
-    
-    // Add folders where user is a member (avoid duplicates)
-    memberSnapshot.forEach(doc => {
-      if (!folders.find(f => f.id === doc.id)) {
-        folders.push({ id: doc.id, ...doc.data() });
-      }
-    });
-
-    return folders;
-  } catch (error) {
-    console.error("Error loading shared folders:", error);
-    return [];
-  }
-}
-
-// ============================================
-// FIX 4: Create shared folder with owner info
-// ============================================
-async function createSharedFolder(folderName, invitedEmails = []) {
-  const currentUser = getCurrentUserEmail();
-  if (!currentUser) {
-    throw new Error("User not logged in");
-  }
-
-  try {
-    const folderData = {
-      name: folderName,
-      owner: currentUser,  // CRITICAL: Tag with owner
-      members: [currentUser, ...invitedEmails],  // Include owner in members
-      pendingInvites: invitedEmails.map(email => ({
-        email: email,
-        invitedBy: currentUser,
-        invitedAt: new Date().toISOString(),
-        status: "pending"
-      })),
-      createdAt: new Date().toISOString(),
-      createdBy: currentUser
-    };
-
-    const folderRef = await window.db.collection("sharedFolders").add(folderData);
-    
-    return { id: folderRef.id, ...folderData };
-  } catch (error) {
-    console.error("Error creating shared folder:", error);
-    throw error;
-  }
-}
-
-// ============================================
-// FIX 5: Share document with proper ownership check
-// ============================================
-async function shareDocument(docId, recipientEmails) {
-  const currentUser = getCurrentUserEmail();
-  if (!currentUser) {
-    throw new Error("User not logged in");
-  }
-
-  try {
-    const docRef = window.db.collection("documents").doc(docId);
-    const docSnap = await docRef.get();
-    
-    if (!docSnap.exists) {
-      throw new Error("Document not found");
-    }
-
-    const docData = docSnap.data();
-    
-    // Check if current user is the owner
-    if (docData.owner !== currentUser) {
-      throw new Error("Only the owner can share this document");
-    }
-
-    // Add recipients to sharedWith array
-    const currentSharedWith = docData.sharedWith || [];
-    const newSharedWith = [...new Set([...currentSharedWith, ...recipientEmails])];
-
-    await docRef.update({
-      sharedWith: newSharedWith,
-      lastModified: new Date().toISOString(),
-      lastModifiedBy: currentUser
-    });
-
-    return { success: true };
-  } catch (error) {
-    console.error("Error sharing document:", error);
-    throw error;
-  }
-}
-
-// ============================================
-// FIX 6: Get documents for specific category with user filter
-// ============================================
-async function getDocumentsByCategory(category) {
-  const currentUser = getCurrentUserEmail();
-  if (!currentUser) {
-    return [];
-  }
-
-  try {
-    const docsCol = window.db.collection("documents");
-    
-    // Get owned documents in this category
-    const ownedSnapshot = await docsCol
-      .where("owner", "==", currentUser)
-      .where("category", "==", category)
-      .where("deletedAt", "==", null)
-      .get();
-    
-    // Get shared documents in this category
-    const sharedSnapshot = await docsCol
-      .where("sharedWith", "array-contains", currentUser)
-      .where("category", "==", category)
-      .where("deletedAt", "==", null)
-      .get();
-
-    const docs = [];
-    
-    ownedSnapshot.forEach(doc => {
-      docs.push({ id: doc.id, ...doc.data() });
-    });
-    
-    sharedSnapshot.forEach(doc => {
-      if (!docs.find(d => d.id === doc.id)) {
-        docs.push({ id: doc.id, ...doc.data() });
-      }
-    });
-
-    return docs;
-  } catch (error) {
-    console.error("Error getting documents by category:", error);
-    return [];
-  }
-}
-
-// ============================================
-// EXPORT ALL FUNCTIONS
-// ============================================
-// Make these available globally or export them
-window.AppFunctions = {
-  loadDocuments,
-  uploadDocument,
-  loadSharedFolders,
-  createSharedFolder,
-  shareDocument,
-  getDocumentsByCategory,
-  getCurrentUserEmail
-};
-
-console.log("✅ User-scoped Firebase functions loaded");
-
-

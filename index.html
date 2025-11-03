@@ -6,7 +6,7 @@
   <title>EcoDocs Dashboard</title>
 
 
-<script src="/forms/eco-wellness/authCheck.js"></script>
+<script src="/public/forms/eco-wellness/authCheck.js"></script>
   
   <!-- פונט -->
   <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -18,8 +18,9 @@
 
 <body>
 <!-- PDF.js מהפרויקט המקומי שלנו -->
-<script src="/libs/pdf.min.js"></script>
-<script src="/libs/pdf.worker.min.js"></script>
+
+<script src="/public/libs/pdf.min.js"></script>
+<script src="/public/libs/pdf.worker.min.js"></script>
 <script>
   if (window['pdfjsLib']) {
     window['pdfjsLib'].GlobalWorkerOptions.workersrc="/libs/pdf.worker.min.js";
@@ -686,11 +687,10 @@ document.addEventListener("DOMContentLoaded", () => {
 </script>
 
 <!-- Initialize Firebase (v10 ESM) and expose window.db / window.fs -->
-<script type="module" src="/firebase-config.js"></script>
 
-<!-- Your app AFTER Firebase globals exist -->
-<script src="/JS/main.js"></script>
+<script type="module" src="/public/firebase-config.js"></script>
 
+<script src="/public/JS/main.js"></script>
 
 
  <div id="react-root"></div>

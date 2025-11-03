@@ -5,6 +5,8 @@ This React project preserves your original **logic, keywords, and styles**.
 - Original scripts are loaded in order by `src/App.jsx`.
 - All original assets live under `public/` with the same paths.
 
+the app is at: eco-docs.netlify.app
+
 ## Run
 ```bash
 

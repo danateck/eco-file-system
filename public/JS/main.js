@@ -319,21 +319,466 @@ window.isFirebaseAvailable = function() {
 };
 
 
-
-
 async function bootFromCloud() {
   try {
-    // 1) Load from Firestore (owned + shared)
-    const cloudDocs = await loadDocuments();   // <-- v9 version below
-    // 2) Fill the local cache the rest of your UI expects
-    allDocsData = cloudDocs || [];
+    showLoading("טוען מסמכים מהענן...");
+    
+    // Load document metadata from Firestore
+    const cloudDocs = await loadDocuments();
+    
+    if (!cloudDocs || cloudDocs.length === 0) {
+      console.log("ℹ️ No documents found in Firestore");
+      allDocsData = [];
+      setUserDocs(userNow, allDocsData, allUsersData);
+      hideLoading();
+      renderHome();
+      return;
+    }
+    
+    console.log(`📥 Found ${cloudDocs.length} documents in Firestore`);
+    
+    // Download missing files from Firebase Storage
+    for (const doc of cloudDocs) {
+      if (doc.downloadURL && doc.id) {
+        // Check if file exists in IndexedDB
+        const existsLocally = await loadFileFromDB(doc.id).catch(() => null);
+        
+        if (!existsLocally) {
+          console.log(`📥 Downloading file for doc: ${doc.id}`);
+          try {
+            // Download file from Storage URL
+            const response = await fetch(doc.downloadURL);
+            const blob = await response.blob();
+            
+            // Convert to base64 and store in IndexedDB
+            const dataUrl = await new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result);
+              reader.readAsDataURL(blob);
+            });
+            
+            await saveFileToDB(doc.id, dataUrl);
+            console.log(`✅ Downloaded and cached file: ${doc.id}`);
+          } catch (e) {
+            console.error(`❌ Failed to download file ${doc.id}:`, e);
+          }
+        }
+      }
+    }
+    
+    // Update local cache
+    allDocsData = cloudDocs;
     setUserDocs(userNow, allDocsData, allUsersData);
+    
+    hideLoading();
+    showNotification(`✅ טענו ${cloudDocs.length} מסמכים`);
+    
   } catch (e) {
-    console.error("Boot from cloud failed:", e);
+    console.error("❌ Boot from cloud failed:", e);
+    hideLoading();
+    showNotification("שגיאה בטעינת מסמכים מהענן", true);
   }
-  // 3) Draw UI after cache is ready
+  
   renderHome();
 }
+
+
+
+async function uploadDocumentWithStorage(file, metadata = {}) {
+  const raw = getCurrentUserEmail();
+  const currentUser = raw ? normalizeEmail(raw) : null;
+  if (!currentUser) throw new Error("User not logged in");
+
+  // Generate doc ID
+  const newId = crypto.randomUUID();
+  
+  let downloadURL = null;
+  
+  // Upload to Firebase Storage if available
+  if (isFirebaseAvailable() && window.storage) {
+    try {
+      showLoading("מעלה קובץ לענן...");
+      
+      const storageRef = window.fs.ref(
+        window.storage, 
+        `documents/${currentUser}/${newId}_${file.name}`
+      );
+      
+      const snapshot = await window.fs.uploadBytes(storageRef, file);
+      downloadURL = await window.fs.getDownloadURL(snapshot.ref);
+      
+      console.log("✅ File uploaded to Storage:", downloadURL);
+      
+    } catch (e) {
+      console.error("❌ Storage upload failed:", e);
+      showNotification("העלאה לענן נכשלה, שומר במכשיר בלבד", true);
+    }
+  }
+  
+  // Save metadata to Firestore
+  if (isFirebaseAvailable()) {
+    try {
+      const docRef = window.fs.doc(window.db, "documents", newId);
+      const docData = {
+        ...metadata,
+        owner: currentUser,
+        downloadURL: downloadURL,
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        uploadedAt: Date.now(),
+        sharedWith: Array.isArray(metadata.sharedWith) ? metadata.sharedWith : [],
+        deletedAt: null,
+        deletedBy: null
+      };
+      
+      await window.fs.setDoc(docRef, docData, { merge: true });
+      console.log("✅ Document metadata saved to Firestore");
+      
+      return { id: newId, ...docData };
+      
+    } catch (e) {
+      console.error("❌ Firestore save failed:", e);
+      throw e;
+    }
+  }
+  
+  // Fallback: local only
+  return {
+    id: newId,
+    ...metadata,
+    fileName: file.name,
+    fileSize: file.size,
+    fileType: file.type,
+    uploadedAt: Date.now(),
+    owner: currentUser,
+    downloadURL: null
+  };
+}
+
+
+// 3. Updated file upload handler (replace in your DOMContentLoaded)
+// Replace your existing fileInput.addEventListener("change", ...) with this:
+
+fileInput.addEventListener("change", async () => {
+  const file = fileInput.files[0];
+  if (!file) {
+    showNotification("❌ ×œ× × ×'×—×¨ ק×•×'×¥", true);
+    return;
+  }
+
+  try {
+    const fileName = file.name.trim();
+
+    // Check for duplicates
+    const alreadyExists = allDocsData.some(doc => {
+      return (
+        doc.originalFileName === fileName &&
+        doc._trashed !== true
+      );
+    });
+    
+    if (alreadyExists) {
+      showNotification("הקובץ הזה כבר קיים בארכיון שלך", true);
+      fileInput.value = "";
+      return;
+    }
+
+    // Guess category
+    let guessedCategory = guessCategoryForFileNameOnly(file.name);
+    if (!guessedCategory || guessedCategory === "אחר") {
+      const manual = prompt(
+        'לא זיהיתי אוטומטית את סוג המסמך.\nלאיזה תיקייה לשמור?\nאפשרויות: ' +
+        CATEGORIES.join(", "),
+        "רפואה"
+      );
+      if (manual && manual.trim() !== "") {
+        guessedCategory = manual.trim();
+      } else {
+        guessedCategory = "אחר";
+      }
+    }
+
+    // Warranty details if needed
+    let warrantyStart = null;
+    let warrantyExpiresAt = null;
+    let autoDeleteAfter = null;
+
+    if (guessedCategory === "אחריות") {
+      let extracted = {
+        warrantyStart: null,
+        warrantyExpiresAt: null,
+        autoDeleteAfter: null,
+      };
+
+      if (file.type === "application/pdf") {
+        const ocrText = await extractTextFromPdfWithOcr(file);
+        const dataFromText = extractWarrantyFromText(ocrText);
+        extracted = { ...extracted, ...dataFromText };
+      }
+
+      if (file.type.startsWith("image/") && window.Tesseract) {
+        const { data } = await window.Tesseract.recognize(file, "heb+eng", {
+          tessedit_pageseg_mode: 6,
+        });
+        const imgText = data?.text || "";
+        const dataFromText = extractWarrantyFromText(imgText);
+        extracted = { ...extracted, ...dataFromText };
+      }
+
+      if (!extracted.warrantyStart && !extracted.warrantyExpiresAt) {
+        const buf = await file.arrayBuffer().catch(() => null);
+        if (buf) {
+          const txt = new TextDecoder("utf-8").decode(buf);
+          const dataFromText = extractWarrantyFromText(txt);
+          extracted = { ...extracted, ...dataFromText };
+        }
+      }
+
+      if (!extracted.warrantyStart && !extracted.warrantyExpiresAt) {
+        const manualData = fallbackAskWarrantyDetails();
+        if (manualData.warrantyStart) {
+          extracted.warrantyStart = manualData.warrantyStart;
+        }
+        if (manualData.warrantyExpiresAt) {
+          extracted.warrantyExpiresAt = manualData.warrantyExpiresAt;
+        }
+        if (manualData.autoDeleteAfter) {
+          extracted.autoDeleteAfter = manualData.autoDeleteAfter;
+        }
+      }
+
+      warrantyStart     = extracted.warrantyStart     || null;
+      warrantyExpiresAt = extracted.warrantyExpiresAt || null;
+      autoDeleteAfter   = extracted.autoDeleteAfter   || null;
+    }
+
+    // Read file as base64 for local storage
+    const fileDataBase64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    const newId = crypto.randomUUID();
+
+    // Save to IndexedDB (local cache)
+    await saveFileToDB(newId, fileDataBase64);
+
+    // Upload to Firebase Storage + Firestore
+    let cloudDoc = null;
+    if (isFirebaseAvailable()) {
+      try {
+        cloudDoc = await uploadDocumentWithStorage(file, {
+          title: fileName,
+          category: guessedCategory,
+          year: new Date().getFullYear().toString(),
+          org: "",
+          recipient: [],
+          warrantyStart,
+          warrantyExpiresAt,
+          autoDeleteAfter
+        });
+        
+        // Use the cloud doc data
+        if (cloudDoc && cloudDoc.id) {
+          // Update local doc with cloud info
+          const newDoc = {
+            id: newId,
+            ...cloudDoc,
+            title: fileName,
+            originalFileName: fileName,
+            mimeType: file.type,
+            hasFile: true
+          };
+          
+          allDocsData.push(newDoc);
+          setUserDocs(userNow, allDocsData, allUsersData);
+          
+          showNotification(`✅ הקובץ נוסף לתיקייה "${guessedCategory}" ושמור בענן`);
+        }
+        
+      } catch (e) {
+        console.error("Cloud upload failed, saving locally only:", e);
+        
+        // Fallback: save locally only
+        const newDoc = {
+          id: newId,
+          title: fileName,
+          originalFileName: fileName,
+          category: guessedCategory,
+          uploadedAt: new Date().toISOString().split("T")[0],
+          year: new Date().getFullYear().toString(),
+          org: "",
+          recipient: [],
+          sharedWith: [],
+          warrantyStart,
+          warrantyExpiresAt,
+          autoDeleteAfter,
+          mimeType: file.type,
+          hasFile: true,
+          downloadURL: null
+        };
+        
+        allDocsData.push(newDoc);
+        setUserDocs(userNow, allDocsData, allUsersData);
+        
+        showNotification(`⚠️ נשמר במכשיר בלבד (ללא סינכרון ענן)`, true);
+      }
+    } else {
+      // No Firebase - local only
+      const newDoc = {
+        id: newId,
+        title: fileName,
+        originalFileName: fileName,
+        category: guessedCategory,
+        uploadedAt: new Date().toISOString().split("T")[0],
+        year: new Date().getFullYear().toString(),
+        org: "",
+        recipient: [],
+        sharedWith: [],
+        warrantyStart,
+        warrantyExpiresAt,
+        autoDeleteAfter,
+        mimeType: file.type,
+        hasFile: true,
+        downloadURL: null
+      };
+      
+      allDocsData.push(newDoc);
+      setUserDocs(userNow, allDocsData, allUsersData);
+      
+      showNotification(`✅ הקובץ נוסף לתיקייה "${guessedCategory}"`);
+    }
+
+    // Refresh UI
+    const currentCat = categoryTitle.textContent;
+    if (currentCat === "אחסון משותף") {
+      openSharedView();
+    } else if (currentCat === "סל מחזור") {
+      openRecycleView();
+    } else if (!homeView.classList.contains("hidden")) {
+      renderHome();
+    } else {
+      openCategoryView(currentCat);
+    }
+
+    fileInput.value = "";
+
+  } catch (err) {
+    console.error("שגיאה בהעלאה:", err);
+    showNotification("הייתה בעיה בהעלאה. נסה שוב או קובץ אחר.", true);
+    hideLoading();
+  }
+});
+
+
+
+// 3. Updated file upload handler (replace in your DOMContentLoaded)
+// Replace your existing fileInput.addEventListener("change", ...) with this:
+
+
+
+
+function handleLogout() {
+  // Clear session
+  sessionStorage.removeItem(CURRENT_USER_KEY);
+  
+  // Stop any active listeners
+  if (stopWatching) stopWatching();
+  if (window._stopMembersWatch) window._stopMembersWatch();
+  if (window._stopSharedDocsWatch) window._stopSharedDocsWatch();
+  
+  // Clear local data
+  allDocsData = [];
+  
+  console.log("🚪 User logged out");
+}
+
+
+
+
+
+
+async function syncAllLocalDocsToCloud() {
+  if (!isFirebaseAvailable()) {
+    showNotification("Firebase לא זמין", true);
+    return;
+  }
+  
+  showLoading("מסנכרן מסמכים לענן...");
+  
+  let synced = 0;
+  let failed = 0;
+  
+  for (const doc of allDocsData) {
+    if (doc._trashed) continue;
+    
+    // Check if already has downloadURL
+    if (doc.downloadURL) {
+      synced++;
+      continue;
+    }
+    
+    // Try to get file from IndexedDB
+    const dataUrl = await loadFileFromDB(doc.id).catch(() => null);
+    if (!dataUrl) {
+      console.warn(`No file data for doc ${doc.id}`);
+      failed++;
+      continue;
+    }
+    
+    // Convert dataURL to Blob
+    try {
+      const response = await fetch(dataUrl);
+      const blob = await response.blob();
+      
+      // Create File object
+      const file = new File(
+        [blob], 
+        doc.originalFileName || doc.fileName || "file", 
+        { type: doc.mimeType || "application/octet-stream" }
+      );
+      
+      // Upload to Storage
+      const currentUser = normalizeEmail(getCurrentUserEmail() || userNow);
+      const storageRef = window.fs.ref(
+        window.storage, 
+        `documents/${currentUser}/${doc.id}_${file.name}`
+      );
+      
+      const snapshot = await window.fs.uploadBytes(storageRef, file);
+      const downloadURL = await window.fs.getDownloadURL(snapshot.ref);
+      
+      // Update Firestore
+      const docRef = window.fs.doc(window.db, "documents", doc.id);
+      await window.fs.updateDoc(docRef, { downloadURL });
+      
+      // Update local
+      doc.downloadURL = downloadURL;
+      synced++;
+      
+      console.log(`✅ Synced doc ${doc.id}`);
+      
+    } catch (e) {
+      console.error(`❌ Failed to sync doc ${doc.id}:`, e);
+      failed++;
+    }
+  }
+  
+  setUserDocs(userNow, allDocsData, allUsersData);
+  hideLoading();
+  
+  showNotification(`✅ ס×•× ×›×¨× ×• ${synced} ×ž×¡×ž×›×™×${failed > 0 ? `, ${failed} × ×›×©×œ×•` : ''}`);
+}
+
+// Make functions globally accessible
+window.syncAllLocalDocsToCloud = syncAllLocalDocsToCloud;
+window.handleLogout = handleLogout;
+
+console.log("✅ Enhanced Firebase persistence loaded");
+
 
 
 

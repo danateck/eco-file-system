@@ -15,40 +15,33 @@ function getCurrentUserEmail() {
 // FIX 1: Load documents with user filtering
 // ============================================
 // v9 modular version
+// v9 modular version
 async function loadDocuments() {
   const raw = getCurrentUserEmail();
   const currentUser = raw ? normalizeEmail(raw) : null;
-  if (!currentUser) {
-    console.error("No user logged in");
-    return [];
-  }
+  if (!currentUser) return [];
+
   if (!isFirebaseAvailable()) {
     console.warn("Firebase unavailable; returning local-only docs");
-    return getUserDocs(getCurrentUser()); // or your local fallback
+    return getUserDocs(getCurrentUser());
   }
 
-  try {
-    const docsCol = window.fs.collection(window.db, "documents");
-    const ownedQ  = window.fs.query(docsCol, window.fs.where("owner", "==", currentUser));
-    const sharedQ = window.fs.query(docsCol, window.fs.where("sharedWith", "array-contains", currentUser));
+  const docsCol = window.fs.collection(window.db, "documents");
+  const ownedQ  = window.fs.query(docsCol, window.fs.where("owner", "==", currentUser));
+  const sharedQ = window.fs.query(docsCol, window.fs.where("sharedWith", "array-contains", currentUser));
 
-    const [ownedSnap, sharedSnap] = await Promise.all([
-      window.fs.getDocs(ownedQ),
-      window.fs.getDocs(sharedQ)
-    ]);
+  const [ownedSnap, sharedSnap] = await Promise.all([
+    window.fs.getDocs(ownedQ),
+    window.fs.getDocs(sharedQ)
+  ]);
 
-    const docs = [];
-    ownedSnap.forEach(d => docs.push({ id: d.id, ...d.data() }));
-    sharedSnap.forEach(d => {
-      if (!docs.find(x => x.id === d.id)) docs.push({ id: d.id, ...d.data() });
-    });
+  const docs = [];
+  ownedSnap.forEach(d => docs.push({ id: d.id, ...d.data() }));
+  sharedSnap.forEach(d => { if (!docs.find(x => x.id === d.id)) docs.push({ id: d.id, ...d.data() }); });
 
-    return docs;
-  } catch (error) {
-    console.error("Error loading documents:", error);
-    return [];
-  }
+  return docs;
 }
+
 
 
 // ============================================
@@ -330,22 +323,18 @@ window.isFirebaseAvailable = function() {
 
 async function bootFromCloud() {
   try {
-    const raw = getCurrentUserEmail();
-    if (!raw) return; // user not logged in yet
-
-    // 1) Pull all the docs for this user from Firestore (owned + shared)
-    const cloudDocs = await loadDocuments(); // uses Firestore queries (v9 modular)
-    // 2) Cache locally (optional), so the rest of the UI can keep using allDocsData
+    // 1) Load from Firestore (owned + shared)
+    const cloudDocs = await loadDocuments();   // <-- v9 version below
+    // 2) Fill the local cache the rest of your UI expects
     allDocsData = cloudDocs || [];
-    setUserDocs(userNow, allDocsData, allUsersData); // local cache only
-
-    // 3) Finally draw UI
-    renderHome();
+    setUserDocs(userNow, allDocsData, allUsersData);
   } catch (e) {
     console.error("Boot from cloud failed:", e);
-    renderHome(); // fallback so UI isn’t blank
   }
+  // 3) Draw UI after cache is ready
+  renderHome();
 }
+
 
 
 

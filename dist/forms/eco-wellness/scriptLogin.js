@@ -35,12 +35,13 @@ async function saveUserDataToFirestore(email, userData) {
 }
 
 async function setCurrentUser(email) {
-    // Store in sessionStorage only (not persistent across browser closes)
-    console.log("Setting current user:", email);
-    sessionStorage.setItem("docArchiveCurrentUser", email);
-    const verify = sessionStorage.getItem("docArchiveCurrentUser");
-    console.log("Verification - User stored in session:", verify);
+  const norm = (email || "").trim().toLowerCase();
+  console.log("Setting current user:", norm);
+  sessionStorage.setItem("docArchiveCurrentUser", norm);
+  const verify = sessionStorage.getItem("docArchiveCurrentUser");
+  console.log("Verification - User stored in session:", verify);
 }
+
 
 async function getCurrentUser() {
     return sessionStorage.getItem("docArchiveCurrentUser");

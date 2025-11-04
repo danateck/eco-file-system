@@ -6,7 +6,7 @@
   <title>EcoDocs Dashboard</title>
 
 
-<script src="/public/forms/eco-wellness/authCheck.js"></script>
+<script type="module" src="/public/forms/eco-wellness/authCheck.js"></script>
   
   <!-- פונט -->
   <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -667,14 +667,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   </script>
 
-<script>
-        // Add this at the bottom
-        // Require user to be logged in to view this page
-        requireLogin();
-        
-        // Now you can get the logged in user
-        
-    </script>
 
 <!-- Import map for bare imports used by firebase-config.js -->
 <script type="importmap">
@@ -688,9 +680,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
 <!-- Initialize Firebase (v10 ESM) and expose window.db / window.fs -->
 
-<script type="module" src="/public/firebase-config.js"></script>
+<script type="module" src="/src/firebase-config.js"></script>
 
-<script src="/public/JS/main.js"></script>
+<script type="module" src="/public/JS/main.js"></script>
 
 
  <div id="react-root"></div>

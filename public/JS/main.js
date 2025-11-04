@@ -2,13 +2,29 @@
 
 
 
+import { app, db, storage, fs } from "../../src/firebase-config.js"; // שנה את הנתיב אם צריך
+
+// ✅ מחזיר תאימות לקוד הישן שלך
+window.app = app;
+window.db = db;
+window.storage = storage;
+window.fs = fs;
+
+console.log("🔥 Firebase globals restored");
+
+
 
 
 
 let stopWatching = null;
 // Add this helper function at the top of your main.js
 function getCurrentUserEmail() {
-  return sessionStorage.getItem("docArchiveCurrentUser") || "";
+  const raw = sessionStorage.getItem("docArchiveCurrentUser") || "";
+  return raw.trim().toLowerCase();
+}
+
+function isFirebaseAvailable() {
+  return !!(window.db && window.fs && typeof window.fs.collection === "function");
 }
 
 // ============================================
@@ -17,31 +33,25 @@ function getCurrentUserEmail() {
 // v9 modular version
 // v9 modular version
 async function loadDocuments() {
-  const raw = getCurrentUserEmail();
-  const currentUser = raw ? normalizeEmail(raw) : null;
-  if (!currentUser) return [];
+  const me = getCurrentUserEmail();
+  if (!me) return [];                 // not logged in yet
+  if (!isFirebaseAvailable()) return []; // no cloud, nothing to load
 
-  if (!isFirebaseAvailable()) {
-    console.warn("Firebase unavailable; returning local-only docs");
-    return getUserDocs(getCurrentUser());
-  }
-
-  const docsCol = window.fs.collection(window.db, "documents");
-  const ownedQ  = window.fs.query(docsCol, window.fs.where("owner", "==", currentUser));
-  const sharedQ = window.fs.query(docsCol, window.fs.where("sharedWith", "array-contains", currentUser));
+  const col = window.fs.collection(window.db, "documents");
+  const qOwned  = window.fs.query(col, window.fs.where("owner", "==", me));
+  const qShared = window.fs.query(col, window.fs.where("sharedWith", "array-contains", me));
 
   const [ownedSnap, sharedSnap] = await Promise.all([
-    window.fs.getDocs(ownedQ),
-    window.fs.getDocs(sharedQ)
+    window.fs.getDocs(qOwned),
+    window.fs.getDocs(qShared),
   ]);
 
-  const docs = [];
-  ownedSnap.forEach(d => docs.push({ id: d.id, ...d.data() }));
-  sharedSnap.forEach(d => { if (!docs.find(x => x.id === d.id)) docs.push({ id: d.id, ...d.data() }); });
+  const map = new Map();
+  ownedSnap.forEach(d => map.set(d.id, { id: d.id, ...d.data() }));
+  sharedSnap.forEach(d => { if (!map.has(d.id)) map.set(d.id, { id: d.id, ...d.data() }); });
 
-  return docs;
+  return Array.from(map.values());
 }
-
 
 
 // ============================================
@@ -83,6 +93,82 @@ async function uploadDocument(file, metadata = {}) {
   await window.fs.setDoc(docRef, docData, { merge: true });
   return { id: newId, ...docData };
 }
+
+
+
+
+function watchMyDocs() {
+  if (!isFirebaseAvailable()) return () => {};
+  if (stopWatching) { try { stopWatching(); } catch (_) {} }
+
+  const me = getCurrentUserEmail();
+  if (!me) return () => {};
+
+  const col = window.fs.collection(window.db, "documents");
+  const qOwned  = window.fs.query(col, window.fs.where("owner", "==", me));
+  const qShared = window.fs.query(col, window.fs.where("sharedWith", "array-contains", me));
+
+  const applySnap = (snap) => {
+    // Merge into global allDocsData (owned + shared)
+    const byId = new Map((allDocsData || []).map(d => [d.id, d]));
+    snap.forEach(doc => {
+      const data = { id: doc.id, ...doc.data() };
+      byId.set(doc.id, data);
+    });
+    allDocsData = Array.from(byId.values());
+    // Make sure your app-level cache also updated:
+    if (typeof setUserDocs === "function" && typeof allUsersData !== "undefined" && typeof userNow !== "undefined") {
+      setUserDocs(userNow, allDocsData, allUsersData);
+    }
+    // Re-render the current view
+    if (typeof categoryTitle !== "undefined" && categoryTitle?.textContent) {
+      const current = categoryTitle.textContent;
+      if (current === "אחסון משותף" && typeof openSharedView === "function") {
+        openSharedView();
+      } else if (current === "סל מחזור" && typeof openRecycleView === "function") {
+        openRecycleView();
+      } else if (typeof openCategoryView === "function") {
+        openCategoryView(current);
+      } else if (typeof renderHome === "function") {
+        renderHome();
+      }
+    } else if (typeof renderHome === "function") {
+      renderHome();
+    }
+  };
+
+  const unsubOwned  = window.fs.onSnapshot(qOwned,  (snap) => applySnap(snap));
+  const unsubShared = window.fs.onSnapshot(qShared, (snap) => applySnap(snap));
+
+  stopWatching = () => { unsubOwned(); unsubShared(); };
+  return stopWatching;
+}
+
+
+
+
+async function bootFromCloud() {
+  const me = getCurrentUserEmail();
+  if (!me || !isFirebaseAvailable()) return;
+
+  try {
+    if (typeof showLoading === "function") showLoading("טוען מסמכים מהענן...");
+    const docs = await loadDocuments();
+    // Save into your app globals (these exist in your project)
+    allDocsData = docs || [];
+    if (typeof setUserDocs === "function" && typeof allUsersData !== "undefined" && typeof userNow !== "undefined") {
+      setUserDocs(userNow, allDocsData, allUsersData);
+    }
+    if (typeof renderHome === "function") renderHome();
+  } finally {
+    if (typeof hideLoading === "function") hideLoading();
+  }
+
+  // start live updates
+  watchMyDocs();
+}
+
+
 
 
 // ============================================
@@ -319,68 +405,6 @@ window.isFirebaseAvailable = function() {
 };
 
 
-async function bootFromCloud() {
-  try {
-    showLoading("טוען מסמכים מהענן...");
-    
-    // Load document metadata from Firestore
-    const cloudDocs = await loadDocuments();
-    
-    if (!cloudDocs || cloudDocs.length === 0) {
-      console.log("ℹ️ No documents found in Firestore");
-      allDocsData = [];
-      setUserDocs(userNow, allDocsData, allUsersData);
-      hideLoading();
-      renderHome();
-      return;
-    }
-    
-    console.log(`📥 Found ${cloudDocs.length} documents in Firestore`);
-    
-    // Download missing files from Firebase Storage
-    for (const doc of cloudDocs) {
-      if (doc.downloadURL && doc.id) {
-        // Check if file exists in IndexedDB
-        const existsLocally = await loadFileFromDB(doc.id).catch(() => null);
-        
-        if (!existsLocally) {
-          console.log(`📥 Downloading file for doc: ${doc.id}`);
-          try {
-            // Download file from Storage URL
-            const response = await fetch(doc.downloadURL);
-            const blob = await response.blob();
-            
-            // Convert to base64 and store in IndexedDB
-            const dataUrl = await new Promise((resolve) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(reader.result);
-              reader.readAsDataURL(blob);
-            });
-            
-            await saveFileToDB(doc.id, dataUrl);
-            console.log(`✅ Downloaded and cached file: ${doc.id}`);
-          } catch (e) {
-            console.error(`❌ Failed to download file ${doc.id}:`, e);
-          }
-        }
-      }
-    }
-    
-    // Update local cache
-    allDocsData = cloudDocs;
-    setUserDocs(userNow, allDocsData, allUsersData);
-    
-    hideLoading();
-    showNotification(`✅ טענו ${cloudDocs.length} מסמכים`);
-    
-  } catch (e) {
-    console.error("❌ Boot from cloud failed:", e);
-    hideLoading();
-    showNotification("שגיאה בטעינת מסמכים מהענן", true);
-  }
-  
-  renderHome();
-}
 
 
 
@@ -743,22 +767,6 @@ console.log("✅ Enhanced Firebase persistence loaded");
 
 
 
-
-
-// generate ONE id, use it everywhere
-const id = crypto.randomUUID();
-
-// save a base64 copy in IndexedDB (local cache)
-await saveFileToDB(id, fileDataBase64);
-
-// write to cloud
-const cloudDoc = await uploadDocumentWithStorage(file, {
-  title: file.name, category: guessedCategory, /* …your fields… */
-}, id);
-
-// push to your in-memory array using the *same* id
-allDocsData.push({ id, ...cloudDoc, hasFile: true, originalFileName: file.name, mimeType: file.type });
-setUserDocs(userNow, allDocsData, allUsersData);
 
 
 
@@ -1288,51 +1296,6 @@ async function syncMySharedDocsToFirestore() {
 
 
 
-
-
-
-
-
-
-function watchMyDocs() {
-  if (stopWatching) stopWatching();
-
-  const me = normalizeEmail(getCurrentUserEmail());
-  if (!me || !isFirebaseAvailable()) return () => {};
-
-  const col = window.fs.collection(window.db, "documents");
-  const qOwned  = window.fs.query(col, window.fs.where("owner", "==", me));
-  const qShared = window.fs.query(col, window.fs.where("sharedWith", "array-contains", me));
-
-  const unsubOwned  = window.fs.onSnapshot(qOwned,  snap => updateFromSnaps("owned",  snap));
-  const unsubShared = window.fs.onSnapshot(qShared, snap => updateFromSnaps("shared", snap));
-
-  function updateFromSnaps(kind, snap) {
-    const map = new Map(allDocsData.map(d => [d.id, d]));
-    snap.forEach(doc => map.set(doc.id, { id: doc.id, ...doc.data() }));
-    allDocsData = [...map.values()];
-    setUserDocs(userNow, allDocsData, allUsersData);
-    // optionally re-render the current view
-    if (!homeView.classList.contains("hidden")) renderHome();
-  }
-
-  stopWatching = () => { unsubOwned(); unsubShared(); };
-  return stopWatching;
-}
-
-// on boot after login:
-async function bootFromCloud() {
-  try {
-    showLoading("טוען מסמכים מהענן...");
-    const cloudDocs = await loadDocuments();        // your v9 loader
-    allDocsData = cloudDocs || [];
-    setUserDocs(userNow, allDocsData, allUsersData);
-  } finally {
-    hideLoading();
-    renderHome();
-    watchMyDocs();                                  // <-- start live sync
-  }
-}
 
 
 
@@ -3264,6 +3227,12 @@ if (currentCat === "אחסון משותף") {
     a.remove();
   });
 
-  // להתחיל בדף הבית
-  bootFromCloud();
+try {
+  if (getCurrentUserEmail() && isFirebaseAvailable()) {
+    await bootFromCloud();  // initial load
+    // watchMyDocs() is called by bootFromCloud(), no need to call twice
+  }
+} catch (e) {
+  console.error("Failed to boot from cloud:", e);
+}
 });
